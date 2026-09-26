@@ -1,0 +1,27 @@
+// Veritabani genisletme set 27: turkce dilbilgisi
+const NEW_ENTRIES = [
+  { k: ['ozne yuklem nesne | cumle ogeleri'], a: "Cümlenin öğeleri: özne, yüklem, nesne, tümleçtir." },
+  { k: ['genis zaman | her zaman'], a: "Geniş zaman her zaman yapılan işi anlatır: giderim." },
+  { k: ['dili gecmis | duyulan gecmis fark'], a: "Görülen geçmiş (gittim), duyulan geçmiş (gitmişim) rivayettir." },
+  { k: ['simdiki zaman | caresiz'], a: "Şimdiki zaman eki -yor: gidiyorum." },
+  { k: ['gelecek zaman | ecek acak'], a: "Gelecek zaman eki -ecek: gideceğim." },
+  { k: ['emir kipi | istek sart'], a: "Emir kipi emir verir: git! İstek: gideyim, şart: gitsem." },
+  { k: ['isim fiil | sifat fiil | zarf fiil'], a: "Fiilimsiler: isim-fiil (gitme), sıfat-fiil (giden), zarf-fiil (gidince)." },
+  { k: ['iyelik ekleri | benim senin'], a: "İyelik ekleri sahiplik bildirir: kitabım, kitabın." },
+  { k: ['hal ekleri | i e de den'], a: "Hal ekleri: yalın, -i, -e, -de, -den." },
+  { k: ['cogul eki | ler lar'], a: "Çoğul eki -ler/-lardır: kitaplar." },
+  { k: ['soru eki mi | ayri yazilir'], a: "Soru eki mi ayrı yazılır: geliyor mu?" },
+  { k: ['de da baglaci | ayri'], a: "Bağlaç olan de/da ayrı yazılır: ben de geldim." },
+  { k: ['ki baglaci | bitisik ki'], a: "Bağlaç ki ayrı, ek olan -ki bitişik yazılır: evdeki." },
+  { k: ['buyuk harf kurallari | ozel isim'], a: "Özel isimler büyük harfle başlar." },
+  { k: ['sayilarin yazimi | rakam harf'], a: "Sayılar yazıyla yazılır, saat ve ölçü rakamla." },
+  { k: ['pekistirme | masmavi | bembeyaz'], a: "Pekiştirme m, p, r, s ile yapılır: masmavi." },
+  { k: ['ikilemeler | yavas yavas'], a: "İkilemeler aynı ya da yakın kelimenin tekrarıdır." },
+  { k: ['yansima sozcuk | pat cat'], a: "Yansıma sözcükler sesi taklit eder: pat, çat." },
+  { k: ['sestes | es sesli | yuz gul'], a: "Sesteş sözcükler yazılışı aynı anlamı farklıdır: yüz, gül, yaz." },
+  { k: ['noktali virgul | iki nokta'], a: "İki nokta açıklama öncesi, noktalı virgül sıralamada kullanılır." },
+  { k: ['kesme isareti | ozel isim eki'], a: "Özel isimlere gelen ek kesmeyle ayrılır: Ankara'nın." },
+  { k: ['unlem | soru isareti'], a: "Ünlem duyguda, soru işareti soruda kullanılır." },
+  { k: ['tirnak isareti | alinti'], a: "Alıntılar tırnak içine alınır." },
+];
+module.exports = NEW_ENTRIES;

@@ -1,0 +1,37 @@
+// Veritabani genisletme set 10: turkiye cografyasi + uzay
+const NEW_ENTRIES = [
+  // Bolgeler
+  { k: ['turkiye kac bolge | 7 bolge'], a: "Türkiye'de 7 coğrafi bölge vardır: Marmara, Ege, Akdeniz, İç Anadolu, Karadeniz, Doğu ve Güneydoğu Anadolu." },
+  { k: ['turkiye komsulari | komsu ulkeler'], a: "Türkiye'nin komşuları: Yunanistan, Bulgaristan, Gürcistan, Ermenistan, İran, Irak ve Suriye'dir." },
+  { k: ['turkiye denizleri | uc tarafi deniz'], a: "Türkiye'nin üç tarafı denizdir: Karadeniz, Ege ve Akdeniz." },
+  { k: ['turkiye en yuksek dagi | agri'], a: "Türkiye'nin en yüksek dağı 5.137 metrelik Ağrı Dağı'dır." },
+  { k: ['turkiye en buyuk golu | van'], a: "Türkiye'nin en büyük gölü Van Gölü'dür." },
+  { k: ['tuz golu | ikinci gol'], a: "Tuz Gölü Türkiye'nin ikinci büyük gölüdür." },
+  { k: ['firat | dicle nehirleri'], a: "Fırat ve Dicle doğudan doğup güneye akan büyük nehirlerdir." },
+  { k: ['kizilirmak | en uzun nehir turkiye'], a: "Kızılırmak 1.355 km ile Türkiye'nin en uzun nehridir." },
+  { k: ['sakarya nehri | yesilirmak'], a: "Sakarya ve Yeşilırmak Karadeniz'e dökülen büyük nehirlerdir." },
+  { k: ['bogazlar | istanbul bogazi | canakkale bogazi'], a: "İstanbul ve Çanakkale boğazları Karadeniz'i Ege'ye bağlar." },
+  { k: ['marmara denizi | adalar'], a: "Marmara Denizi iç denizimizdir, Prens Adaları buradadır." },
+  { k: ['toroslar | kackar | uludag dag'], a: "Toroslar Akdeniz'de, Kaçkar Karadeniz'de, Uludağ Bursa'dadır." },
+  { k: ['karadeniz iklimi | akdeniz iklimi fark'], a: "Karadeniz her mevsim yağışlı, Akdeniz yazı sıcak-kurak iklimdir." },
+  { k: ['dogu anadolu | en soguk il'], a: "Doğu Anadolu en soğuk bölgemizdir, kışın -30'lar görülür." },
+  { k: ['guneydogu | gap'], a: "GAP Güneydoğu'nun sulama ve enerji projesidir." },
+  { k: ['ic anadolu | step iklimi'], a: "İç Anadolu bozkır iklimlidir, buğday ambarımızdır." },
+  // Uzay
+  { k: ['ay evreleri | hilal dolunay'], a: "Ay evreleri: yeni ay, hilal, ilk dördün, dolunay, son dördün." },
+  { k: ['gunes tutulmasi | ay tutulmasi fark'], a: "Güneş tutulmasında Ay Güneş'i kapatır, Ay tutulmasında Dünya'nın gölgesi Ay'a düşer." },
+  { k: ['yildiz nedir | isik yili'], a: "Yıldızlar dev gaz toplarıdır, ışıkları bize ışık yılıyla ölçülür." },
+  { k: ['samanyolu | galaksi'], a: "Samanyolu içinde yaşadığımız sarmal galaksidir." },
+  { k: ['kara delik | olay ufku'], a: "Kara delik çekimi ışıktan güçlü çökmüş yıldızdır." },
+  { k: ['kutup yildizi | demirkazik'], a: "Kutup Yıldızı kuzeyi gösterir, Büyükayı ile bulunur." },
+  { k: ['buyukayi | kucukayi'], a: "Büyükayı kepçe şeklindeki ünlü takımyıldızdır." },
+  { k: ['meteor | kayan yildiz | gol tasi'], a: "Meteor atmosfere giren kayaçtır, halk arasında kayan yıldız denir." },
+  { k: ['kuyruklu yildiz | halley'], a: "Kuyruklu yıldızlar buz-kaya kütleleridir, Halley ünlüdür." },
+  { k: ['uzayda yercekimi | agirliksizlik'], a: "Uzayda ağırlıksızlık hissi sürekli düşme halidir." },
+  { k: ['ilk insan uzayda | gagarin'], a: "Uzaya ilk çıkan insan 1961'de Yuri Gagarin'dir." },
+  { k: ['aya ilk ayak basan | armstrong'], a: "Ay'a ilk ayak basan 1969'da Neil Armstrong'dur." },
+  { k: ['ilk turk uzayda | alper gezeravci'], a: "Uzaya çıkan ilk Türk 2024'te Alper Gezeravcı'dır." },
+  { k: ['james webb | hubble teleskop'], a: "Hubble ve James Webb uzayın derinliklerini gören teleskoplardır." },
+  { k: ['marsda su | kizil gezegen'], a: "Mars'ta geçmişte su aktığına dair kanıtlar bulundu." },
+];
+module.exports = NEW_ENTRIES;

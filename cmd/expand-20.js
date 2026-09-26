@@ -1,0 +1,25 @@
+// Veritabani genisletme set 20: bilim insanlari
+const NEW_ENTRIES = [
+  { k: ['marie curie | radyum | polonyum'], a: "Marie Curie radyumu buldu, iki Nobel alan tek kadındır." },
+  { k: ['galileo | teleskop | dunya donuyor'], a: "Galileo teleskobu gökyüzüne çevirip Dünya'nın döndüğünü savundu." },
+  { k: ['darwin | evrim | turler'], a: "Darwin doğal seçilimle evrim kuramını kurdu." },
+  { k: ['pasteur | pastorizasyon | kuduz asisi'], a: "Pasteur pastörizasyonu buldu, kuduz aşısını geliştirdi." },
+  { k: ['mendel | bezelye | genetik'], a: "Mendel bezelyelerle genetiğin yasalarını buldu." },
+  { k: ['arsimet | hamam | kaldirma'], a: "Arşimet suyun kaldırma kuvvetini buldu." },
+  { k: ['pisagor | dik ucgen baginti'], a: "Pisagor dik üçgen bağıntısıyla ünlüdür." },
+  { k: ['oklid | geometri'], a: "Öklid geometrinin kurucusudur." },
+  { k: ['hipokrat | tip yemini'], a: "Hipokrat tıp yemininin sahibidir." },
+  { k: ['farabi | ikinci ogretmen'], a: "Farabi İkinci Öğretmen sayılan İslam bilginidir." },
+  { k: ['biruni | olcme bilgini'], a: "Biruni gök ve yer ölçümleriyle ünlü bilgindir." },
+  { k: ['ulug bey | semerkant rasathane'], a: "Uluğ Bey Semerkant'ta rasathane kuran hükümdar-bilgindir." },
+  { k: ['cezeri | robot | sibernetik'], a: "Cezeri otomatlarıyla robotiğin öncüsüdür." },
+  { k: ['katip celebi | kesfu zunun | cihannuma'], a: "Katip Çelebi Keşfü'z-Zünun ve Cihannüma'nın yazarıdır." },
+  { k: ['hezarfen | galata ucmak'], a: "Hezarfen Galata'dan Üsküdar'a kanatla uçtuğu anlatılır." },
+  { k: ['ibn haldun | mukaddime | sosyoloji'], a: "İbn Haldun Mukaddime ile sosyolojinin öncüsüdür." },
+  { k: ['tesla | alternatif akim | edison rakibi'], a: "Tesla alternatif akımı yaygınlaştırdı." },
+  { k: ['alexander graham bell | ilk telefon gorusmesi'], a: "Bell ilk telefon görüşmesini yaptı." },
+  { k: ['nobel kim | dinamint | isvec'], a: "Nobel dinamitin mucidi, ödüllerin kurucusudur." },
+  { k: ['ada lovelace | ilk programci'], a: "Ada Lovelace ilk bilgisayar programcısı sayılır." },
+  { k: ['alan turing | enigma | yapay zeka testi'], a: "Turing Enigma'yı çözdü, yapay zeka testiyle anılır." },
+];
+module.exports = NEW_ENTRIES;

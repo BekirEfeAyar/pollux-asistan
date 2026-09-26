@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#FFFFFF</color>
+    <color name="card">#FFFFFF</color>
+    <color name="ink">#111111</color>
+    <color name="muted">#6E6E80</color>
+    <color name="gold">#B07C3F</color>
+    <color name="goldSoft">#F5EEDF</color>
+    <color name="line">#E5E5E5</color>
+    <color name="logBg">#F4F4F5</color>
+    <color name="logText">#333338</color>
+    <color name="ok">#3D9A50</color>
+    <color name="err">#D9534F</color>
+    <color name="launcher_bg">#17171A</color>
+    <color name="onGold">#141414</color>
+</resources>

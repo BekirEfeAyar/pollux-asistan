@@ -925,17 +925,109 @@ async function researcher(query) {
   if (answer.length > 4500) answer = answer.slice(0, 4500).trim() + '...';
   return { title, answer, source: names.join(' + ') || 'İnternet', url: urls[0] || '', urls };
 }
-async function aiAsk(query) {
+// ---------- yapay zeka (RAG sentezi icin) ----------
+// 1) DuckDuckGo chat (gpt-4o-mini, anahtarsiz) 2) Pollinations. Biri tutar.
+async function duckStatus() {
   try {
-    const prompt = encodeURIComponent(personaPrompt() +
-      'Soruyu ayrıntılı, düzenli ve akıcı Türkçe ile cevapla (gerekirse maddeler kullan, giriş cümlesi kurma): ' +
-      query.trim());
-    const t = await get('https://text.pollinations.ai/' + prompt, 45000);
-    const text = t.trim();
-    if (text.length < 30) return null;
-    const tr = await translateTR(text.slice(0, 2000));
-    return tr;
+    const r = await new Promise((resolve, reject) => {
+      const req = https.request({
+        host: 'duckduckgo.com', path: '/duckchat/v1/status', method: 'GET', agent: noReuseAgent,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+          'x-vqd-accept': '1',
+        },
+      }, (s) => {
+        const h = {};
+        for (const k in s.headers) h[k.toLowerCase()] = s.headers[k];
+        s.resume();
+        s.on('end', () => resolve(h));
+      });
+      req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+      req.on('error', reject);
+      req.setTimeout(10000);
+      req.end();
+    });
+    return r['x-vqd-4'] || r['x-vqd-hash-1'] || null;
   } catch (e) { return null; }
+}
+async function duckChat(prompt) {
+  const vqd = await duckStatus();
+  if (!vqd) return null;
+  try {
+    const body = JSON.stringify({
+      model: 'openai/gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+    });
+    const t = await new Promise((resolve, reject) => {
+      const req = https.request({
+        host: 'duckduckgo.com', path: '/duckchat/v1/chat', method: 'POST', agent: noReuseAgent,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+          'x-vqd-4': vqd, 'Content-Type': 'application/json', Accept: 'text/event-stream',
+        },
+      }, (s) => {
+        if (s.statusCode < 200 || s.statusCode >= 300) { s.resume(); reject(new Error('HTTP ' + s.statusCode)); return; }
+        let d = '';
+        s.setEncoding('utf8');
+        s.on('data', (c) => { d += c; });
+        s.on('end', () => resolve(d));
+      });
+      req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+      req.on('error', reject);
+      req.setTimeout(40000);
+      req.write(body);
+      req.end();
+    });
+    // SSE: data: {"message": "..."} satirlari (en uzun olani al)
+    let best = '';
+    for (const line of t.split('\n')) {
+      const lt = line.trim();
+      if (!lt.startsWith('data:')) continue;
+      const payload = lt.slice(5).trim();
+      if (!payload || payload === '[DONE]') continue;
+      try {
+        const o = JSON.parse(payload);
+        const txt = o.message || (o.delta && o.delta.content) || o.content || '';
+        if (typeof txt === 'string' && txt.length > best.length) best = txt;
+      } catch (e) {}
+    }
+    best = best.trim();
+    return best.length > 20 ? best.slice(0, 2500) : null;
+  } catch (e) { return null; }
+}
+async function pollinationsAsk(prompt, ms) {
+  for (let i = 0; i < 2; i++) {
+    try {
+      const t = await get('https://text.pollinations.ai/' + encodeURIComponent(prompt) + '?model=openai', ms || 30000);
+      const text = t.trim();
+      if (text.length >= 30 && !/ENOSPC|deprecat/i.test(text)) return text.slice(0, 2500);
+    } catch (e) {}
+  }
+  return null;
+}
+async function llmAsk(prompt) {
+  return (await duckChat(prompt)) || (await pollinationsAsk(prompt));
+}
+// Kaynaklara dayali Turkce sentez (RAG): duzenli, maddeli, girissiz
+async function synthesizeTR(question, context, sourceNames) {
+  if (!context || context.trim().length < 60) return null;
+  const ctx = context.trim().slice(0, 3000);
+  const prompt = personaPrompt() +
+    'Aşağıdaki KAYNAKLARA dayanarak soruyu Türkçe cevapla. Kurallar: düzenli ve ayrıntılı ol, ' +
+    'gereken yerde madde kullan, giriş cümlesi kurma, kaynaksız bilgi uydurma, cevabın sonunda ' +
+    '"Kaynaklar:" diye bir satır açıp kullanılan kaynak adlarını yaz.\n' +
+    'SORU: ' + question.trim() + '\nKAYNAKLAR (' + sourceNames + '):\n' + ctx;
+  return await llmAsk(prompt);
+}
+// Dogrudan yapay zeka cevabi (arastirma yoksa son care)
+async function aiAsk(query) {
+  const prompt = personaPrompt() +
+    'Soruyu ayrıntılı, düzenli ve akıcı Türkçe ile cevapla (gerekirse maddeler kullan, giriş cümlesi kurma): ' +
+    query.trim();
+  const text = await llmAsk(prompt);
+  if (!text) return null;
+  const tr = await translateTR(text.slice(0, 2000));
+  return tr;
 }
 async function newsTop(n) {
   try {
@@ -1052,6 +1144,10 @@ async function newsSearch(topic, n) {
     return titles.length ? titles : null;
   } catch (e) { return null; }
 }
+
+// Oturum hafizasi: takip sorulari ("o ne demek", "daha fazla") son konuya baglanir
+let lastTopic = '', lastTitle = '', lastContext = '';
+const PRON_TOKS = new Set(['o', 'bu', 'bunu', 'bunun', 'onun', 'onlar', 'peki', 'hmm', 'ee', 'sey', 'ya']);
 
 // ---------- ana cozumleme ----------
 const CREDIT = "Beni yapan muazzam kişi Bekir Efe AYAR'dır, isteyenler için Instagram hesabı şudur: https://www.instagram.com/efebekir_slm/";
@@ -1381,6 +1477,28 @@ async function answer(raw) {
     query = tokens.filter((t) => t !== 'arastir' && t !== 'arastir').join(' ');
     if (!query.trim()) return 'Neyi araştırayım? Konuyu da yaz (örn: kemal sunal araştır).';
   }
+  // Oturum hafizasi: zamir/takip sorusunu son konuya bagla ("o ne demek", "yasi kac")
+  {
+    const ct = contentTokens(query).map(stemTr).filter((w) => w.length >= 3);
+    const bare = fold(query.toLowerCase()).split(' ').filter(Boolean);
+    const QW = new Set(['ne', 'nedir', 'nedi', 'nasil', 'neden', 'nicin', 'niye', 'kim', 'kac',
+      'hangi', 'hangisi', 'nerede', 'neresi', 'mi', 'mu', 'misin', 'musun', 'kadar']);
+    const hasQ = bare.some((t) => PRON_TOKS.has(t) || QW.has(t));
+    const isFollowup = lastTopic && (ct.length === 0 || (ct.length === 1 && hasQ));
+    if (isFollowup) query = lastTopic + ' ' + query;
+  }
+  // "daha fazla/detayli" ayni konuda derinlesir (yeni arama yok, sentez genisler)
+  if (lastContext && lastTopic &&
+    (/daha (fazla|detayli|ayrintili)/.test(f) || f.includes('detay ver') || f.includes('acikla') || f.includes('genislet'))) {
+    if (await hasInternet()) {
+      const exp = await synthesizeTR('Şu konuyu daha ayrıntılı anlat: ' + lastTopic, lastContext, 'önceki araştırma');
+      if (exp) {
+        const full = exp + '\n(Derinleştirme)';
+        learn(lastTopic + ' detay', full);
+        return full;
+      }
+    }
+  }
   // gundem: genel ya da konulu ("galatasaray haberleri") — bankadan once (canli veri)
   if (f.includes('gundem') || f.includes('son dakika') || f.includes('son haber') ||
     f.includes('bugun ne oldu') || f.includes('turkiyede ne oluyor') || f.includes('haberler') ||
@@ -1426,17 +1544,34 @@ async function answer(raw) {
   if (r) {
     const links = (r.urls && r.urls.length ? r.urls : (r.url ? [r.url] : [])).slice(0, 5);
     const linkLine = links.length ? '\nBağlantılar:\n' + links.join('\n') : '';
-    const base = r.title.replace(/\s*-\s*(wikipedia|vikipedi)$/i, '').trim();
-    const dup = base && (r.answer.startsWith(r.title) ||
-      r.answer.toLowerCase().startsWith(base.toLowerCase()));
-    const body = dup ? r.answer : r.title + ': ' + r.answer;
+    // RAG: kaynaklari LLM ile duzenli Turkce senteze donustur (sure sinirli, olmazsa ham metin)
+    let synth = null;
+    try {
+      synth = await Promise.race([
+        synthesizeTR(query, r.answer, r.source),
+        new Promise((res) => setTimeout(() => res(null), 80000)),
+      ]);
+    } catch (e) { synth = null; }
+    const rawBody = (() => {
+      const base = r.title.replace(/\s*-\s*(wikipedia|vikipedi)$/i, '').trim();
+      const dup = base && (r.answer.startsWith(r.title) ||
+        r.answer.toLowerCase().startsWith(base.toLowerCase()));
+      return dup ? r.answer : r.title + ': ' + r.answer;
+    })();
+    const body = synth || rawBody;
     const full = body + '\n(Kaynak: ' + r.source + ')' + linkLine;
     learn(query, full);
+    lastTopic = cleanTopic(query) || query;
+    lastTitle = r.title;
+    lastContext = r.answer;
     return full;
   }
   const aiText = await aiAsk(query);
   if (aiText) {
     learn(query, aiText + '\n(Yapay zeka yanıtı)');
+    lastTopic = cleanTopic(query) || query;
+    lastTitle = '';
+    lastContext = '';
     return aiText + '\n(Yapay zeka yanıtı)';
   }
   // Zorunlu arastirma bile bos donduyse bankadaki kisa cevaba dus

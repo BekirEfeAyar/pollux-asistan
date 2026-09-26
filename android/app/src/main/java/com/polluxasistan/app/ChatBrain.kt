@@ -23,7 +23,20 @@ class ChatBrain(
     private val news: NewsFetcher = NewsFetcher(appCtx),
     private val ai: AiBridge = AiBridge(appCtx),
     private val learned: LearnedStore = LearnedStore(appCtx)
-) {
+    ) {
+
+    // Oturum hafızası: takip soruları ("o ne demek", "daha fazla") son konuya bağlanır
+    private var lastTopic: String = ""
+    private var lastTitle: String = ""
+    private var lastContext: String = ""
+
+    private fun knowledgeTokens(s: String): List<String> {
+        return try {
+            knowledge.tokens(s).map { knowledge.stem(it) }.filter { it.length >= 3 }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
     sealed interface Action {
         object FlashOn : Action
         object FlashOff : Action
@@ -760,6 +773,40 @@ class ChatBrain(
                 return Answer("Neyi araştırayım? Konuyu da yaz (örn: kemal sunal araştır).")
             }
         }
+        // Oturum hafızası: zamir/takip sorusunu son konuya bağla ("o ne demek", "yaşı kaç")
+        run {
+            val ct = try {
+                knowledgeTokens(query)
+            } catch (_: Exception) {
+                emptyList()
+            }
+            val bare = fold(query.lowercaseTurkish()).split(" ").map { it.trim() }.filter { it.isNotBlank() }
+            val qw = setOf(
+                "ne", "nedir", "nedi", "nasil", "neden", "nicin", "niye", "kim", "kac",
+                "hangi", "hangisi", "nerede", "neresi", "mi", "mu", "misin", "musun", "kadar"
+            )
+            val pron = setOf("o", "bu", "bunu", "bunun", "onun", "onlar", "peki", "hmm", "ee", "sey", "ya")
+            val hasQ = bare.any { pron.contains(it) || qw.contains(it) }
+            val isFollowup = lastTopic.isNotBlank() && (ct.isEmpty() || (ct.size == 1 && hasQ))
+            if (isFollowup) query = "$lastTopic $query"
+        }
+        // "daha fazla/detaylı" aynı konuda derinleşir (yeni arama yok, sentez genişler)
+        if (lastContext.isNotBlank() && lastTopic.isNotBlank() &&
+            (Regex("daha (fazla|detayli|ayrintili)").containsMatchIn(f) || f.contains("detay ver") || f.contains("acikla") || f.contains("genislet"))
+        ) {
+            if (researcher.hasInternet()) {
+                try {
+                    val exp = researcher.synthesizeTR(
+                        "Şu konuyu daha ayrıntılı anlat: $lastTopic", lastContext, "önceki araştırma"
+                    )
+                    if (!exp.isNullOrBlank()) {
+                        val full = exp + "\n(Derinleştirme)"
+                        learned.add("$lastTopic detay", full)
+                        return Answer(full)
+                    }
+                } catch (_: Exception) {}
+            }
+        }
         // Önce bilgi bankası + öğrenilenler (internetsiz de çalışır)
         if (!forceResearch) {
             try {
@@ -795,17 +842,41 @@ class ChatBrain(
         if (r != null) {
             val links = (if (r.urls.isNotEmpty()) r.urls else (if (r.url.isNotBlank()) listOf(r.url) else emptyList())).take(5)
             val linkLine = if (links.isNotEmpty()) "\nBağlantılar:\n" + links.joinToString("\n") else ""
-            val base = r.title.replace(Regex("\\s*-\\s*(wikipedia|vikipedi)$", RegexOption.IGNORE_CASE), "").trim()
-            val dup = base.isNotBlank() &&
-                (r.answer.startsWith(r.title) || r.answer.lowercase().startsWith(base.lowercase()))
-            val body = if (dup) r.answer else "${r.title}: ${r.answer}"
+            // RAG: kaynakları LLM ile düzenli Türkçe senteze dönüştür (olmazsa ham metin)
+            var synth: String? = null
+            try {
+                synth = researcher.synthesizeTR(query, r.answer, r.source)
+            } catch (_: Exception) {
+                synth = null
+            }
+            val rawBody = run {
+                val base = r.title.replace(Regex("\\s*-\\s*(wikipedia|vikipedi)$", RegexOption.IGNORE_CASE), "").trim()
+                val dup = base.isNotBlank() &&
+                    (r.answer.startsWith(r.title) || r.answer.lowercase().startsWith(base.lowercase()))
+                if (dup) r.answer else "${r.title}: ${r.answer}"
+            }
+            val body = synth ?: rawBody
             val full = "$body\n(Kaynak: ${r.source})$linkLine"
             learned.add(query, full)
+            lastTopic = try {
+                researcher.cleanTopic(query).ifBlank { query }
+            } catch (_: Exception) {
+                query
+            }
+            lastTitle = r.title
+            lastContext = r.answer
             return Answer(full)
         }
         try {
             ai.ask(query)?.let {
                 learned.add(query, "$it\n(Yapay zeka yanıtı)")
+                lastTopic = try {
+                    researcher.cleanTopic(query).ifBlank { query }
+                } catch (_: Exception) {
+                    query
+                }
+                lastTitle = ""
+                lastContext = ""
                 return Answer("$it\n(Yapay zeka yanıtı)")
             }
         } catch (_: Exception) {}

@@ -58,7 +58,7 @@ class Researcher(private val context: Context) {
             if (w.url.isNotBlank() && !urls.contains(w.url)) urls.add(w.url)
             if (w.title.isNotBlank()) title = w.title
         }
-        val d = ddgSearch(topic) ?: ddgSearch(raw)
+        val d = ddgSearch(topic, query) ?: ddgSearch(raw, query)
         if (d != null) {
             parts.add("Öne çıkan sonuçlar:\n" + translateTR(d.answer))
             val du = if (d.urls.isNotEmpty()) d.urls else (if (d.url.isNotBlank()) listOf(d.url) else emptyList())
@@ -307,6 +307,10 @@ class Researcher(private val context: Context) {
     }
 
     private fun ddgSearch(topic: String): Result? {
+        return ddgSearch(topic, topic)
+    }
+
+    private fun ddgSearch(topic: String, rawQuery: String): Result? {
         if (topic.length < 2) return null
         return try {
             val enc = URLEncoder.encode(topic, "UTF-8")
@@ -337,15 +341,78 @@ class Researcher(private val context: Context) {
                 }
             }
             if (hits.isEmpty()) return null
-            val first = hits[0]
+            // ALAKA FİLTRESİ: sorguyla alakasız sonuçları ele (random dökülmesin)
+            val kb = try { Knowledge(context) } catch (_: Exception) { null }
+            val qtokens: List<String> = if (kb != null) {
+                kb.tokens(rawQuery).map { kb.stem(it) }.filter { it.length >= 3 }
+            } else {
+                rawQuery.lowercase(java.util.Locale("tr", "TR")).split(" ").filter { it.length >= 4 }
+            }
+            val thr = if (Regex("fark|ayirt|karsilastir|mukayese").containsMatchIn(
+                    rawQuery.lowercase(java.util.Locale("tr", "TR"))
+                )
+            ) 0.6 else 0.4
+            val scored = mutableListOf<Pair<Hit, Double>>()
+            for (ho in hits) {
+                var cov = 0.0
+                var exactLong = false
+                if (kb != null && qtokens.isNotEmpty()) {
+                    val wt = kb.tokens(ho.title + " " + ho.snip).map { kb.stem(it) }
+                        .filter { it.length >= 3 }
+                    var hit = 0
+                    for (q in qtokens) {
+                        var p = 0
+                        for (w in wt) {
+                            p = maxOf(p, kb.tokenScore(w, q))
+                            if (p >= 2) break
+                        }
+                        if (p > 0) {
+                            hit++
+                            if (p >= 2 && q.length >= 6) exactLong = true
+                        }
+                    }
+                    if (wt.isNotEmpty()) cov = hit.toDouble() / qtokens.size
+                } else {
+                    val low = (ho.title + " " + ho.snip).lowercase()
+                    var hit = 0
+                    for (q in qtokens) if (low.contains(q)) hit++
+                    if (qtokens.isNotEmpty()) cov = hit.toDouble() / qtokens.size
+                }
+                if (cov >= thr || exactLong) scored.add(Pair(ho, cov))
+            }
+            if (scored.isEmpty()) return null
+            scored.sortByDescending { it.second }
+            // Benzer tekrarları ele
+            fun tokSet(hh: Hit): Set<String> {
+                return (hh.title + " " + hh.snip).lowercase().split(Regex("[^a-zçğıöşü]+"))
+                    .filter { it.length >= 4 }.toSet()
+            }
+            val kept = mutableListOf<Pair<Hit, Double>>()
+            for (pr in scored) {
+                val st = tokSet(pr.first)
+                var dup = false
+                for (kp in kept) {
+                    val kt = tokSet(kp.first)
+                    val inter = st.intersect(kt).size.toDouble()
+                    val union = (st.size + kt.size - inter).coerceAtLeast(1.0).toDouble()
+                    if (inter / union >= 0.75) {
+                        dup = true
+                        break
+                    }
+                }
+                if (!dup) kept.add(pr)
+                if (kept.size >= 3) break
+            }
+            if (kept.isEmpty()) return null
+            val first = kept[0].first
             var answer = (if (first.title.isNotBlank()) first.title + ": " else "") + first.snip
-            for (i in 1 until hits.size) {
-                if (hits[i].snip.isNotBlank()) answer += "\n• " + hits[i].snip
+            for (i in 1 until kept.size) {
+                if (kept[i].first.snip.isNotBlank()) answer += "\n• " + kept[i].first.snip
             }
             answer = answer.trim()
             if (answer.length < 40) return null
             if (answer.length > 2500) answer = answer.take(2500).trim() + "..."
-            val urls = hits.map { it.href }.distinct()
+            val urls = kept.map { it.first.href }.distinct()
             Result(first.title.ifBlank { topic }, answer, "DuckDuckGo", first.href, urls)
         } catch (_: Exception) {
             null
@@ -360,6 +427,121 @@ class Researcher(private val context: Context) {
             conn.setRequestProperty("User-Agent", ua)
             conn.inputStream.bufferedReader().use { it.readText() }
         } catch (_: Exception) { null }
+    }
+
+    // ---------- yapay zeka (RAG sentezi icin): DuckDuckGo chat -> Pollinations ----------
+
+    private val duckUA =
+        "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36"
+
+    private fun duckStatus(): String? {
+        return try {
+            val conn = (URL("https://duckduckgo.com/duckchat/v1/status").openConnection() as HttpURLConnection).apply {
+                connectTimeout = 10_000
+                readTimeout = 10_000
+                requestMethod = "GET"
+                setRequestProperty("User-Agent", duckUA)
+                setRequestProperty("x-vqd-accept", "1")
+            }
+            conn.connect()
+            if (conn.responseCode !in 200..299) return null
+            conn.inputStream.close()
+            conn.getHeaderField("x-vqd-4") ?: conn.getHeaderField("x-vqd-hash-1")
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun duckChat(prompt: String): String? {
+        val vqd = duckStatus() ?: return null
+        return try {
+            val body = JSONObject()
+                .put("model", "openai/gpt-4o-mini")
+                .put("messages", org.json.JSONArray().put(JSONObject().put("role", "user").put("content", prompt)))
+                .toString()
+            val conn = (URL("https://duckduckgo.com/duckchat/v1/chat").openConnection() as HttpURLConnection).apply {
+                connectTimeout = 10_000
+                readTimeout = 40_000
+                requestMethod = "POST"
+                doOutput = true
+                setRequestProperty("User-Agent", duckUA)
+                setRequestProperty("x-vqd-4", vqd)
+                setRequestProperty("Content-Type", "application/json")
+                setRequestProperty("Accept", "text/event-stream")
+            }
+            conn.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(body) }
+            if (conn.responseCode !in 200..299) return null
+            val text = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            var best = ""
+            for (line in text.split("\n")) {
+                val lt = line.trim()
+                if (!lt.startsWith("data:")) continue
+                val payload = lt.removePrefix("data:").trim()
+                if (payload.isBlank() || payload == "[DONE]") continue
+                try {
+                    val o = JSONObject(payload)
+                    var txt = o.optString("message", "")
+                    if (txt.isBlank()) txt = o.optJSONObject("delta")?.optString("content", "") ?: ""
+                    if (txt.isBlank()) txt = o.optString("content", "")
+                    if (txt.length > best.length) best = txt
+                } catch (_: Exception) {}
+            }
+            best = best.trim()
+            if (best.length > 20) best.take(2500) else null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun pollinationsAsk(prompt: String): String? {
+        for (i in 0 until 2) {
+            try {
+                val enc = URLEncoder.encode(prompt, "UTF-8")
+                val t = httpGet(URL("https://text.pollinations.ai/$enc?model=openai"), 30000) ?: continue
+                val text = t.trim()
+                if (text.length >= 30 && !text.contains("ENOSPC", true) && !text.contains("deprecat", true)) {
+                    return text.take(2500)
+                }
+            } catch (_: Exception) {}
+        }
+        return null
+    }
+
+    private fun llmAsk(prompt: String): String? {
+        return try {
+            duckChat(prompt) ?: pollinationsAsk(prompt)
+        } catch (_: Exception) {
+            try {
+                pollinationsAsk(prompt)
+            } catch (_: Exception) {
+                null
+            }
+        }
+    }
+
+    /** Kaynaklara dayalı Türkçe sentez (RAG): düzenli, maddeli, girişsiz. */
+    fun synthesizeTR(question: String, context: String, sourceNames: String): String? {
+        if (context.trim().length < 60) return null
+        return try {
+            val ctx = context.trim().take(3000)
+            val prompt = "Sen Pollux adında bir asistansın. Karakterin: sıcak, esprili ama saygılı, " +
+                "meraklı, bazen soru soran, robot gibi değil arkadaş gibi konuşan. " +
+                "Aşağıdaki KAYNAKLARA dayanarak soruyu Türkçe cevapla. Kurallar: düzenli ve ayrıntılı ol, " +
+                "gereken yerde madde kullan, giriş cümlesi kurma, kaynaksız bilgi uydurma, cevabın sonunda " +
+                "\"Kaynaklar:\" diye bir satır açıp kullanılan kaynak adlarını yaz.\n" +
+                "SORU: " + question.trim() + "\nKAYNAKLAR (" + sourceNames + "):\n" + ctx
+            // Süre üst sınırı: 80 sn (olmazsa ham metin döner)
+            var out: String? = null
+            val t = Thread { out = try { llmAsk(prompt) } catch (_: Exception) { null } }
+            t.start()
+            t.join(80_000)
+            try {
+                if (t.isAlive) t.interrupt()
+            } catch (_: Exception) {}
+            out
+        } catch (_: Exception) {
+            null
+        }
     }
 
     // ---------- canlı veri (hepsi ücretsiz + anahtarsız) ----------

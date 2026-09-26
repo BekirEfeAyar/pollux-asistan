@@ -1,6 +1,6 @@
 {
   "name": "pollux-asistan",
-  "version": "2.0.17",
+  "version": "2.0.18",
   "description": "Pollux: çevrimdışı öncelikli Türkçe CMD asistanı (2500+ kayıt bilgi bankası, sözlük, hesap, uygulama açma, araştırma)",
   "main": "pollux.js",
   "bin": {

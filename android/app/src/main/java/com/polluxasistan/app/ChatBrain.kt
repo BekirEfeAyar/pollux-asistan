@@ -63,7 +63,7 @@ class ChatBrain(
         if (f.contains("iyi geceler") || f.contains("iyi uykular")) {
             return Answer("İyi geceler! Tatlı rüyalar.")
         }
-        if (shortMsg && !tokens.contains("misin") && tokens.any { it in setOf("merhaba", "selam", "hey", "gunaydin", "gunaydinlar", "iyi", "aksamlar", "günaydın") } ||
+        if (shortMsg && !tokens.contains("misin") && tokens.any { it in setOf("merhaba", "selam", "selamlar", "slm", "mrb", "hey", "gunaydin", "gunaydinlar", "iyi", "aksamlar", "günaydın") } ||
             f.contains("iyi aksam") || f.contains("iyi gunler") || f == "naber"
         ) {
             return Answer("Merhaba! Sana nasıl yardımcı olabilirim?")
@@ -116,7 +116,7 @@ class ChatBrain(
                 )
             )
         }
-        if (f.contains("seni seviyorum") || f.contains("seni cok seviyorum")) {
+        if ((tokens.contains("seviyorum") && tokens.contains("seni")) || f.contains("seni cok seviyorum")) {
             return Answer("Ben de seni seviyorum. İyi ki varsın.")
         }
         if (f.contains("ozledim")) {
@@ -153,6 +153,16 @@ class ChatBrain(
         }
         if (f.contains("iyi misin")) {
             return Answer("İyiyim, teşekkürler. Sen iyi misin?")
+        }
+        if (tokens.contains("iyiyim") || tokens.contains("iyiyimdir")) {
+            return Answer(
+                Persona.pick(
+                    appCtx,
+                    listOf(Persona.V("Harika, sevindim! Ben de iyiyim, günün nasıl geçiyor?")),
+                    listOf(Persona.V("Sevindim! Ben de iyiyim. Anlat bakalım, günün nasıl?")),
+                    listOf(Persona.V("Sevindim, ben de iyiyim. Teşekkür ederim."))
+                )
+            )
         }
         if (f.contains("evli misin") || f.contains("bekar misin")) {
             return Answer("Ben yazılımla evliyim, sadığım da.")
@@ -207,7 +217,7 @@ class ChatBrain(
         if (f.contains("kac yasindasin") || f.contains("yasin kac")) {
             return Answer("Çok yeniyim, daha bebek sayılırım.")
         }
-        if (f.contains("ne yapabilirsin") || f.contains("neler yapabilirsin") || f == "yardim" ||
+        if (f.contains("ne yapabilirsin") || f.contains("napabilirsin") || f.contains("neler yapabilirsin") || f == "yardim" ||
             f.contains("yardim et") || f.contains("ozelliklerin") || f.contains("neler biliyorsun")
         ) {
             return Answer(

@@ -1066,7 +1066,7 @@ async function answer(raw) {
   const tokens = f.split(' ').map((t) => t.trim()).filter(Boolean);
   const shortMsg = tokens.length <= 3;
 
-  if ((shortMsg && !tokens.includes('misin') && (['merhaba', 'selam', 'hey', 'gunaydin', 'gunaydinlar', 'iyi', 'aksamlar'].some((w) => tokens.includes(w)) || f.includes('iyi aksam') || f.includes('iyi gunler'))) || f === 'naber') {
+  if ((shortMsg && !tokens.includes('misin') && (['merhaba', 'selam', 'selamlar', 'slm', 'mrb', 'hey', 'gunaydin', 'gunaydinlar', 'iyi', 'aksamlar'].some((w) => tokens.includes(w)) || f.includes('iyi aksam') || f.includes('iyi gunler'))) || f === 'naber') {
     return 'Merhaba! Ben Pollux, senin asistanın. Sana nasıl yardımcı olabilirim?';
   }
   if (f.includes('iyi geceler') || f.includes('iyi uykular')) return 'İyi geceler! Tatlı rüyalar.';
@@ -1089,7 +1089,7 @@ async function answer(raw) {
     [C('Seni duymak günümü güzelleştirdi. Umarım seninki de güzel geçiyordur.')],
     [C('Gayet güzel, teşekkür ederim. Sizin gününüz nasıl geçti?')]
   );
-  if (f.includes('seni seviyorum') || f.includes('seni cok seviyorum')) return 'Ben de seni seviyorum. İyi ki varsın.';
+  if ((tokens.includes('seviyorum') && tokens.includes('seni')) || f.includes('seni cok seviyorum')) return 'Ben de seni seviyorum. İyi ki varsın.';
   if (f.includes('ozledim')) return 'Ben hep buradayım, özlemene gerek yok.';
   if (f.includes('harikasin') || f.includes('muhtesemsin') || f.includes('cok iyisin') || f.includes('guzelsin') || f.includes('tatlisin') || f.includes('cok zekisin') || f.includes('akillisin')) {
     return pick(['Teşekkür ederim, sen de harikasın!', 'Çok naziksin. Sen de öylesin.', 'Bunu duymak günümü aydınlattı, sağ ol.', 'Mahcup oldum. Sen de bir tanesin.']);
@@ -1102,6 +1102,13 @@ async function answer(raw) {
     return pick(['Üzüldüm. Ama şunu bil: ben hep buradayım, dinlerim. Anlatmak ister misin?', 'Kötü hissetmek insani bir şey, geçecek. İstersen sana moral vereyim, ister misin?', 'Yanındayım. Derin bir nefes al, sonra içini dök. Dinliyorum.']);
   }
   if (f.includes('iyi misin')) return 'İyiyim, teşekkürler. Sen iyi misin?';
+  if (tokens.includes('iyiyim') || tokens.includes('iyiyimdir')) {
+    return personaPick(
+      [C('Harika, sevindim! Ben de iyiyim, günün nasıl geçiyor?')],
+      [C('Sevindim! Ben de iyiyim. Anlat bakalım, günün nasıl?')],
+      [C('Sevindim, ben de iyiyim. Teşekkür ederim.')]
+    );
+  }
   if (f.includes('evli misin') || f.includes('bekar misin')) return 'Ben yazılımla evliyim, sadığım da.';
   if (f.includes('burcun ne')) return 'Benim burcum kod burcu. Seninki ne?';
   if (f.includes('en sevdigin renk')) return 'Senin sevdiğin renk hangisiyse o.';
@@ -1156,7 +1163,7 @@ async function answer(raw) {
     if (tokens.includes('ac') || tokens.includes('acar')) return 'Bu uygulamayı bulamadım. Tam adını yazmayı dene (örn: spotify aç). Yüklüleri görmek için: uygulamaları listele';
   }
   if (f.includes('kac yasindasin') || f.includes('yasin kac')) return 'Çok yeniyim, daha bebek sayılırım.';
-  if (f.includes('ne yapabilirsin') || f.includes('neler yapabilirsin') || f === 'yardim' ||
+  if (f.includes('ne yapabilirsin') || f.includes('napabilirsin') || f.includes('neler yapabilirsin') || f === 'yardim' ||
     f.includes('yardim et') || f.includes('ozelliklerin') || f.includes('neler biliyorsun')) {
     return 'Şunları yapabilirim:\n- Sohbet (selamlaşma, şaka, atasözü)\n- Hesap (örn: 12 artı 5, 3*4, 100/4)\n- Birim ve sıcaklık çevirme (örn: 5 km kaç metre)\n- İngilizce-Türkçe sözlük (örn: apple ne demek)\n- Uygulama açma (örn: notepad aç, youtube aç, uygulamaları listele)\n- Saat ve tarih, hayvanlar-uzay-tarih bilgileri\n- İnternet varken yapay zekaya sorup araştırma yaparım';
   }

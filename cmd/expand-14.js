@@ -1,0 +1,28 @@
+// Veritabani genisletme set 14: ev + bahce pratikleri
+const NEW_ENTRIES = [
+  { k: ['cam silme | iz kalmasin'], a: "Cam silerken mikrofiber bez ve sirkeli su iz bırakmaz." },
+  { k: ['firin temizligi | yag cozme'], a: "Fırın yağına karbonat-su karışımı sürüp beklet, sonra sil." },
+  { k: ['kirec cozme | caydanlik kireci'], a: "Çaydanlık kirecine sirke-su kaynatmak iyi gelir." },
+  { k: ['pas cozme | metal pas'], a: "Pasa sirke veya limon-tuz sürüp beklet, sonra fırçala." },
+  { k: ['camasir yumusatici | statik'], a: "Yumuşatıcı çamaşırı yumuşatır, ölçüsünde kullan." },
+  { k: ['halı leke | koltuk leke'], a: "Lekeye hemen soğuk su ve bezle bastır, ovalama." },
+  { k: ['kotu koku | buzdolabi kokusu'], a: "Buzdolabı kokusuna açık kapta karbonat koyulur." },
+  { k: ['sinek kovucu | dogal cozum'], a: "Pencereye fesleğen, kapıya lavanta sinekleri uzak tutar." },
+  { k: ['domates yetistirme | fide'], a: "Domates güneşi sever, toprağı nemli tutulur, sırıkla desteklenir." },
+  { k: ['biber yetistirme'], a: "Biber sıcak ve güneş ister, suyu dengeli verilir." },
+  { k: ['salatalik yetistirme'], a: "Salatalık bol su ister, sabah sulanır." },
+  { k: ['cilek yetistirme | saksida'], a: "Çilek saksıda bile yetişir, güneşi ve düzenli suyu sever." },
+  { k: ['feslegen | nane | maydanoz yetistirme'], a: "Fesleğen, nane ve maydanoz balkonda kolay yetişir." },
+  { k: ['limon agaci | saksida limon'], a: "Limon ağacı aydınlık ve esintisiz yeri sever." },
+  { k: ['sardunya | cicek bakimi'], a: "Sardunya güneşi sever, toprağı kuruyunca sulanır." },
+  { k: ['kaktus sulama | sukulent bakim'], a: "Kaktüs toprağı tamamen kuruyunca sulanır." },
+  { k: ['orkide sulama | cicek actirma'], a: "Orkide haftada bir sulanır, aydınlık ama direkt güneşsiz yer sever." },
+  { k: ['gubre | kompost'], a: "Kompost mutfak atıklarından doğal gübredir." },
+  { k: ['bebek atesi | 38 derece cocuk'], a: "Bebekte 38 üstü ateşte üstü inceltilir, ılık uygulama yapılır, düşmezse doktora gidilir." },
+  { k: ['bebek dis cikarma | huzursuzluk'], a: "Diş çıkarmada soğuk diş kaşıyıcı rahatlatır." },
+  { k: ['bebek uyku duzeni | rutin'], a: "Bebek uykusunda ılık banyo ve aynı saat rutini işe yarar." },
+  { k: ['emzirme | anne sutu'], a: "Anne sütü ilk 6 ay tek başına yeterlidir." },
+  { k: ['ek gida | 6 ay sonrasi'], a: "Ek gıdaya 6. aydan sonra doktor önerisiyle geçilir." },
+  { k: ['cocuk ates dusurme | ilik dus'], a: "Ateşli çocuğa ılık duş ve bol sıvı verilir, aspirin verilmez." },
+];
+module.exports = NEW_ENTRIES;

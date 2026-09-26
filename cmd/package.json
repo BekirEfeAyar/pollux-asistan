@@ -1,0 +1,27 @@
+{
+  "name": "pollux-asistan",
+  "version": "2.0.15",
+  "description": "Pollux: çevrimdışı öncelikli Türkçe CMD asistanı (2500+ kayıt bilgi bankası, sözlük, hesap, uygulama açma, araştırma)",
+  "main": "pollux.js",
+  "bin": {
+    "pollux": "pollux.js"
+  },
+  "files": [
+    "pollux.js",
+    "knowledge.json",
+    "dict.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": ["asistan", "assistant", "turkce", "turkish", "offline", "cli", "chatbot"],
+  "author": "Bekir Efe AYAR",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14"
+  },
+  "preferGlobal": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bekirefeayar/pollux-asistan.git"
+  }
+}

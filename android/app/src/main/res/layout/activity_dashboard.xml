@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Moderatör Paneli"
+            android:textColor="@color/ink"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/statsText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Yükleniyor..."
+            android:textColor="@color/gold"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="KULLANICILAR"
+            android:textColor="@color/gold"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:layout_marginTop="8dp" />
+
+        <ListView
+            android:id="@+id/usersList"
+            android:layout_width="match_parent"
+            android:layout_height="220dp"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/card_soft"
+            android:divider="@color/line"
+            android:dividerHeight="1dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="SORULAN SORULAR"
+            android:textColor="@color/gold"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp" />
+
+        <ListView
+            android:id="@+id/questionsList"
+            android:layout_width="match_parent"
+            android:layout_height="320dp"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/card_soft"
+            android:divider="@color/line"
+            android:dividerHeight="1dp" />
+
+    </LinearLayout>
+</ScrollView>

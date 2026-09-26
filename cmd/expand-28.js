@@ -1,0 +1,26 @@
+// Veritabani genisletme set 28: matematik formuller
+const NEW_ENTRIES = [
+  { k: ['kare alan | cevre'], a: "Karenin alanı a², çevresi 4a'dır." },
+  { k: ['dikdortgen alan | cevre'], a: "Dikdörtgenin alanı a×b, çevresi 2(a+b)'dir." },
+  { k: ['ucgen alan'], a: "Üçgenin alanı taban×yükseklik/2'dir." },
+  { k: ['daire alan | cevre 2 pi r'], a: "Dairenin alanı πr², çevresi 2πr'dir." },
+  { k: ['kup hacim'], a: "Küpün hacmi a³'tür." },
+  { k: ['silindir hacim'], a: "Silindirin hacmi πr²h'dir." },
+  { k: ['kure hacim'], a: "Kürenin hacmi 4/3πr³'tür." },
+  { k: ['pisagor | dik ucgen baginti | pisagor bagintisi'], a: "Pisagor: dik üçgende a²+b²=c²'dir." },
+  { k: ['oran oranti | dogru ters'], a: "Orantıda içler-dışlar çarpımı eşittir." },
+  { k: ['ondalik sayi | virgul'], a: "Ondalık sayıda virgülden sonra basamak değeri küçülür." },
+  { k: ['negatif sayi | eksi arti'], a: "Eksi ile eksinin çarpımı artıdır." },
+  { k: ['mutlak deger'], a: "Mutlak değer sayının sıfıra uzaklığıdır, hep pozitiftir." },
+  { k: ['koklu sayi | karekok'], a: "Karekök, karesi verilen sayıyı bulmaktır." },
+  { k: ['bolunebilme | 2 3 5 9 10'], a: "3'e bölünmede rakamlar toplamı 3'ün katı olur." },
+  { k: ['ebob ekok'], a: "EBOB en büyük ortak bölen, EKOK en küçük ortak kattır." },
+  { k: ['aci cesitleri | dar dik genis'], a: "Açılar: dar (<90), dik (=90), geniş (>90)." },
+  { k: ['dortgenler | paralelkenar yamuk'], a: "Dörtgenler: kare, dikdörtgen, paralelkenar, yamuk." },
+  { k: ['cember daire fark'], a: "Çember çizgi, daire içiyle birlikte alandır." },
+  { k: ['olasilik | zar olasilik'], a: "Olasılık istenen bölü tüm durumdur." },
+  { k: ['indirim hesabi | zam hesabi'], a: "İndirimde fiyat (100-oran)/100 ile çarpılır." },
+  { k: ['hiz problem | x vt'], a: "Yol = hız × zamandır." },
+  { k: ['ortalama hesabi | aritmetik'], a: "Ortalama toplamın sayıya bölümüdür." },
+];
+module.exports = NEW_ENTRIES;

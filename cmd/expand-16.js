@@ -1,0 +1,28 @@
+// Veritabani genisletme set 16: cumhuriyet tarihi derin
+const NEW_ENTRIES = [
+  { k: ['dandanakan | selcuklu kurulus'], a: "Selçuklu Devleti 1040 Dandanakan Zaferi'yle kuruldu." },
+  { k: ['miryokefalon | 1176'], a: "Miryokefalon 1176'da kazanıldı, Anadolu kesin Türk yurdu oldu." },
+  { k: ['dogu cephesi | gumru antlasmasi'], a: "Doğu Cephesi'nde Kazım Karabekir Ermenileri yendi, Gümrü Antlaşması imzalandı." },
+  { k: ['guney cephesi | sutcu imam | antep savunmasi'], a: "Güney Cephesi'nde Antep, Urfa ve Maraş halkı direndi; Sütçü İmam ilk kurşunu attı." },
+  { k: ['birinci inonu | ikinci inonu'], a: "I. ve II. İnönü savaşları 1921'de Yunanlara karşı kazanıldı." },
+  { k: ['sakarya | hattı mudafaa | 1921'], a: "Sakarya 1921'de 22 gün sürdü, Atatürk Başkomutan oldu." },
+  { k: ['buyuk taarruz | 26 agustos 1922 | dumlupinar'], a: "Büyük Taarruz 26 Ağustos 1922'de başladı, Dumlupınar'da zafer kazanıldı." },
+  { k: ['sevr | olu dogan antlasma'], a: "Sevr 1920'de dayatıldı ama uygulanamadı." },
+  { k: ['ankara antlasmasi | sakarya sonrasi fransa'], a: "Sakarya sonrası Fransa ile Ankara Antlaşması imzalandı." },
+  { k: ['kars antlasmasi | dogu siniri'], a: "Kars Antlaşması doğu sınırımızı çizdi." },
+  { k: ['lozan ne zaman imzalandi | 24 temmuz 1923'], a: "Lozan 24 Temmuz 1923'te imzalandı." },
+  { k: ['musul meselesi | 1926 ankara'], a: "Musul 1926 Ankara Antlaşması'yla sınır dışında kaldı." },
+  { k: ['hatay | 1939 katilma'], a: "Hatay 1939'da Türkiye'ye katıldı." },
+  { k: ['halifelik ne zaman kaldirildi | 3 mart 1924'], a: "Hilafet 3 Mart 1924'te kaldırıldı." },
+  { k: ['sapka kanunu | tekke zaviye'], a: "Şapka Kanunu ve tekke-zaviyelerin kapatılması 1925'tedir." },
+  { k: ['medeni kanun | isvicre 1926'], a: "Medeni Kanun 1926'da İsviçre'den alındı." },
+  { k: ['kadin secme secilme | 1934'], a: "Kadınlara genel seçme-seçilme hakkı 1934'te verildi." },
+  { k: ['soyadi kanunu | ataturk soyadi'], a: "Soyadı Kanunu 1934'tedir, Atatürk soyadı o yıl verildi." },
+  { k: ['istiklal marsi kabul | 12 mart 1921'], a: "İstiklal Marşı 12 Mart 1921'de kabul edildi." },
+  { k: ['izmir iktisat | 1923 ekonomi'], a: "İzmir İktisat Kongresi 1923'te toplandı." },
+  { k: ['ilk meclis baskani | 23 nisan baskani'], a: "İlk Meclis'in başkanı Mustafa Kemal'di." },
+  { k: ['vahdettin | son padisah'], a: "Son padişah Vahdettin'dir." },
+  { k: ['yavuz mısır seferi | 1517 hilafet'], a: "Yavuz 1517'de Mısır'ı alıp hilafeti getirdi." },
+  { k: ['iznik baskent | ilk osmanli baskenti'], a: "Osmanlı'nın ilk başkentleri Söğüt, İznik ve Bursa'dır." },
+];
+module.exports = NEW_ENTRIES;

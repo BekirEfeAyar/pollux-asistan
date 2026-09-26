@@ -1,0 +1,25 @@
+// Veritabani genisletme set 24: oyunlar + masal kahramanlari
+const NEW_ENTRIES = [
+  { k: ['saklambac | sobe'], a: "Saklambaçta ebe sayar, saklananlar sobelemeye çalışır." },
+  { k: ['korebe'], a: "Körebede gözü bağlı ebe arkadaşlarını yakalar." },
+  { k: ['seksek'], a: "Seksekte taş tek ayakla karelerden geçirilir." },
+  { k: ['yakar top'], a: "Yakartopta ortaya dizilenler topla vurulmamaya çalışır." },
+  { k: ['mendil kapmaca'], a: "Mendil kapmacada ortadaki mendili kapıp kaçılır." },
+  { k: ['dokuz tas | kale yikma'], a: "Dokuz taşta taşlar dizilir, ebe kaleyi korur." },
+  { k: ['mangala | turk zeka oyunu'], a: "Mangala taş toplama strateji oyunudur." },
+  { k: ['dama | tavla fark'], a: "Damada taş yenir, tavlada zarla pul ilerler." },
+  { k: ['tavla mars | zar tutma'], a: "Tavlada mars rakibi hiç pul toplayamamaktır." },
+  { k: ['okey | per | okey tasi'], a: "Okeyde amaç per dizmektir, okey taşı jokerdir." },
+  { k: ['keloglan | dev anasi'], a: "Keloğlan masalların zeki kahramanıdır." },
+  { k: ['hacivat karagoz | golge oyunu'], a: "Hacivat ile Karagöz gölge oyunu kahramanlarıdır." },
+  { k: ['battal gazi | danisment'], a: "Battal Gazi destan kahramanıdır." },
+  { k: ['sari saltuk'], a: "Sarı Saltuk Balkanlara İslam'ı taşıyan erendir." },
+  { k: ['pamuk prenses | yedi cuceler'], a: "Pamuk Prenses yedi cücelerle yaşayan masal kahramanıdır." },
+  { k: ['kulkedisi | cam ayakkabi'], a: "Külkedisi cam ayakkabılı masal kahramanıdır." },
+  { k: ['uyuyan guzel | atop'], a: "Uyuyan Güzel yüzyıllık uykulu masal kahramanıdır." },
+  { k: ['kirmizi baslikli kiz | kurt buyukanne'], a: "Kırmızı Başlıklı Kız kurda yakalanan masal kahramanıdır." },
+  { k: ['rapunzel | kule sac'], a: "Rapunzel kulede yaşayan uzun saçlı masal kahramanıdır." },
+  { k: ['hansel gratel | seker ev'], a: "Hansel ile Gretel şeker evli masal kahramanlarıdır." },
+  { k: ['cizmeli kedi'], a: "Çizmeli Kedi kurnaz masal kahramanıdır." },
+];
+module.exports = NEW_ENTRIES;

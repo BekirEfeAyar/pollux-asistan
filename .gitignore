@@ -1,0 +1,13 @@
+# Android Studio üretim artıkları
+.gradle/
+.idea/
+.kotlin/
+build/
+app/build/
+local.properties
+*.apk
+*.ap_
+*.dex
+# Sistem
+.DS_Store
+Thumbs.db

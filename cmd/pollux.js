@@ -1369,11 +1369,18 @@ async function answer(raw) {
 
   // bilgi bankasi + arastirma
   let query = raw;
+  let forceResearch = false;
   const qf = raw.toLocaleLowerCase('tr').trim();
   for (const p of ['araştır ', 'arastir ', 'ara ', 'bilgi ver ', 'hakkında bilgi ver ', 'hakkinda bilgi ']) {
-    if (qf.startsWith(p)) { query = raw.trim().slice(p.length).trim(); break; }
+    if (qf.startsWith(p)) { query = raw.trim().slice(p.length).trim(); forceResearch = true; break; }
   }
   if (!query.trim()) query = raw;
+  // "arastir" sonda da olabilir ("kemal sunali arastir")
+  if (!forceResearch && (tokens.includes('arastir') || tokens.includes('arastir'))) {
+    forceResearch = true;
+    query = tokens.filter((t) => t !== 'arastir' && t !== 'arastir').join(' ');
+    if (!query.trim()) return 'Neyi araştırayım? Konuyu da yaz (örn: kemal sunal araştır).';
+  }
   // gundem: genel ya da konulu ("galatasaray haberleri") — bankadan once (canli veri)
   if (f.includes('gundem') || f.includes('son dakika') || f.includes('son haber') ||
     f.includes('bugun ne oldu') || f.includes('turkiyede ne oluyor') || f.includes('haberler') ||
@@ -1394,8 +1401,11 @@ async function answer(raw) {
     if (!heads) return 'Haberlere şu an ulaşamadım. Biraz sonra tekrar dene.';
     return 'Gündemde öne çıkanlar:\n' + heads.map((h, i) => (i + 1) + ') ' + h.title + (h.source ? ' (' + h.source + ')' : '')).join('\n');
   }
-  const kb = findKnowledge(query, learned.map((e) => ({ k: [e.q], a: e.a })));
-  if (kb) return kb;
+  // "arastir" denirse DOSDOGRU arastirmaya git (bankadaki kisa cevap yetmez)
+  if (!forceResearch) {
+    const kb = findKnowledge(query, learned.map((e) => ({ k: [e.q], a: e.a })));
+    if (kb) return kb;
+  }
 
   // konum: bilgi bankasinda yoksa haritada goster
   if (f.includes('nerede') || f.includes('neresi') || f.includes('konum') || f.includes('haritada') || f.includes('harita')) {
@@ -1428,6 +1438,11 @@ async function answer(raw) {
   if (aiText) {
     learn(query, aiText + '\n(Yapay zeka yanıtı)');
     return aiText + '\n(Yapay zeka yanıtı)';
+  }
+  // Zorunlu arastirma bile bos donduyse bankadaki kisa cevaba dus
+  if (forceResearch) {
+    const kb2 = findKnowledge(query, learned.map((e) => ({ k: [e.q], a: e.a })));
+    if (kb2) return kb2 + '\n(Detaylı araştırma yapamadım, interneti kontrol et.)';
   }
   return personaPick(
     [C('Hmm, bunu tam çıkaramadım ya. Başka türlü anlatsana? Kısa sorarsan daha iyi yakalarım.')],

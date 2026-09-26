@@ -740,20 +740,32 @@ class ChatBrain(
         }
 
         // ---- Bilgi bankası + araştırma ----
-        // "araştır X" denirse X temizlenip önce bankada, yoksa internette aranır.
+        // "araştır X" denirse X temizlenip DOSDOĞRU araştırmaya gidilir.
         var query = raw
+        var forceResearch = false
         val qf = query.lowercaseTurkish().trim()
         for (p in listOf("araştır ", "arastir ", "ara ", "bilgi ver ", "hakkında bilgi ver ", "hakkinda bilgi ")) {
             if (qf.startsWith(p)) {
                 query = query.trim().substring(p.length).trim()
+                forceResearch = true
                 break
             }
         }
         if (query.isBlank()) query = raw
+        // "araştır" sonda da olabilir ("kemal sunal araştır", katlanmış hali arastir)
+        if (!forceResearch && tokens.contains("arastir")) {
+            forceResearch = true
+            query = tokens.filter { it != "arastir" }.joinToString(" ")
+            if (query.isBlank()) {
+                return Answer("Neyi araştırayım? Konuyu da yaz (örn: kemal sunal araştır).")
+            }
+        }
         // Önce bilgi bankası + öğrenilenler (internetsiz de çalışır)
-        try {
-            knowledge.find(query, learned.all())?.let { return Answer(it) }
-        } catch (_: Exception) {}
+        if (!forceResearch) {
+            try {
+                knowledge.find(query, learned.all())?.let { return Answer(it) }
+            } catch (_: Exception) {}
+        }
 
         // Konum: bankada yoksa haritada göster
         if (f.contains("nerede") || f.contains("neresi") || f.contains("konum") || f.contains("haritada") || f.contains("harita")) {
@@ -797,6 +809,14 @@ class ChatBrain(
                 return Answer("$it\n(Yapay zeka yanıtı)")
             }
         } catch (_: Exception) {}
+        // Zorunlu araştırma bile boş döndüyse bankadaki kısa cevaba düş
+        if (forceResearch) {
+            try {
+                knowledge.find(query, learned.all())?.let {
+                    return Answer("$it\n(Detaylı araştırma yapamadım, interneti kontrol et.)")
+                }
+            } catch (_: Exception) {}
+        }
         return Answer(
             Persona.pick(
                 appCtx,

@@ -27,6 +27,7 @@ class MainActivity : AppCompatActivity() {
     private var voiceFrag: VoiceFragment? = null
     private var currentTab = 0 // 0 yazılı, 1 sesli
     private var firstSwitch = true
+    private lateinit var netDot: View
 
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemeHelper.apply(this)
@@ -46,6 +47,7 @@ class MainActivity : AppCompatActivity() {
         tabTextLine = findViewById(R.id.tabTextLine)
         tabVoiceLine = findViewById(R.id.tabVoiceLine)
         newChatBtn = findViewById(R.id.newChatBtn)
+        netDot = findViewById(R.id.netDot)
         val menuBtn: android.widget.ImageButton = findViewById(R.id.menuBtn)
 
         menuBtn.setOnClickListener { drawer.openDrawer(GravityCompat.START) }
@@ -124,6 +126,19 @@ class MainActivity : AppCompatActivity() {
             return
         }
         refreshDrawer()
+        // İnternet noktası (yeşil çevrimiçi / kırmızı çevrimdışı)
+        Thread {
+            val online = try {
+                Researcher(applicationContext).hasInternet()
+            } catch (_: Exception) {
+                false
+            }
+            runOnUiThread {
+                try {
+                    netDot.setBackgroundResource(if (online) R.drawable.dot_ok else R.drawable.dot_bad)
+                } catch (_: Exception) {}
+            }
+        }.start()
     }
 
     private fun switchTab(tab: Int) {

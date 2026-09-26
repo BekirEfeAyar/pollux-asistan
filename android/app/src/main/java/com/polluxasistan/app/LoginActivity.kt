@@ -26,6 +26,21 @@ class LoginActivity : AppCompatActivity() {
         }
         setContentView(R.layout.activity_login)
 
+        // Giris animasyonu: logo + baslik yumusak belirir
+        try {
+            val avatar: android.view.View = findViewById(R.id.loginAvatar)
+            val title: android.view.View = findViewById(R.id.loginTitle)
+            val loginBtn: android.view.View = findViewById(R.id.loginBtn)
+            for ((i, v) in listOf(avatar, title, loginBtn).withIndex()) {
+                v.alpha = 0f
+                v.translationY = 28f
+                v.animate().alpha(1f).translationY(0f).setStartDelay((i * 120).toLong())
+                    .setDuration(380)
+                    .setInterpolator(android.view.animation.DecelerateInterpolator(1.4f))
+                    .start()
+            }
+        } catch (_: Exception) {}
+
         val mailEdit: EditText = findViewById(R.id.mailEdit)
         val nameEdit: EditText = findViewById(R.id.nameEdit)
         val passEdit: EditText = findViewById(R.id.passEdit)

@@ -14,11 +14,12 @@
         android:gravity="center">
 
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/loginAvatar"
             android:layout_width="96dp"
             android:layout_height="96dp"
             android:layout_marginTop="48dp"
             app:cardCornerRadius="48dp"
-            app:cardElevation="0dp"
+            app:cardElevation="6dp"
             app:cardBackgroundColor="@color/bg"
             app:strokeColor="@color/gold"
             app:strokeWidth="2dp">
@@ -30,6 +31,7 @@
         </com.google.android.material.card.MaterialCardView>
 
         <TextView
+            android:id="@+id/loginTitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Pollux"

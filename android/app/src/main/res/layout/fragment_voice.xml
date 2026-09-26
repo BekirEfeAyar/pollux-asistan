@@ -80,15 +80,27 @@
         android:textColor="@color/muted"
         android:textSize="13sp" />
 
-    <ImageButton
-        android:id="@+id/voiceMicBtn"
-        android:layout_width="84dp"
-        android:layout_height="84dp"
+    <FrameLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:layout_marginBottom="20dp"
-        android:background="@drawable/btn_mic_off"
-        android:src="@drawable/ic_mic"
-        android:tint="@color/ink"
-        android:scaleType="center"
-        android:contentDescription="Konuş" />
+        android:layout_marginBottom="20dp">
+
+        <View
+            android:layout_width="104dp"
+            android:layout_height="104dp"
+            android:layout_gravity="center"
+            android:background="@drawable/mic_ring" />
+
+        <ImageButton
+            android:id="@+id/voiceMicBtn"
+            android:layout_width="84dp"
+            android:layout_height="84dp"
+            android:layout_gravity="center"
+            android:background="@drawable/btn_mic_off"
+            android:src="@drawable/ic_mic"
+            android:tint="@color/ink"
+            android:scaleType="center"
+            android:contentDescription="Konuş" />
+    </FrameLayout>
 </LinearLayout>

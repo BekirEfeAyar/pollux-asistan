@@ -6,6 +6,11 @@
         <item name="android:textColorHint">@color/muted</item>
         <item name="android:editTextStyle">@style/Widget.SesliAsistan.EditText</item>
         <item name="android:windowBackground">@color/bg</item>
+        <item name="colorPrimary">@color/gold</item>
+        <item name="colorOnPrimary">@color/onGold</item>
+        <item name="colorSecondary">@color/gold</item>
+        <item name="colorSurface">@color/card</item>
+        <item name="colorOnSurface">@color/ink</item>
     </style>
 
     <style name="Widget.SesliAsistan.EditText" parent="Widget.AppCompat.EditText">

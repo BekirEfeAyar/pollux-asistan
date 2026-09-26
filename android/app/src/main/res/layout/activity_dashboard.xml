@@ -19,6 +19,12 @@
             android:textSize="24sp"
             android:textStyle="bold" />
 
+        <View
+            android:layout_width="64dp"
+            android:layout_height="3dp"
+            android:layout_marginTop="8dp"
+            android:background="@color/gold" />
+
         <TextView
             android:id="@+id/statsText"
             android:layout_width="match_parent"

@@ -84,6 +84,14 @@ object Prefs {
     /** Tema: 0 sistem, 1 açık, 2 koyu */
     fun themeMode(ctx: Context): Int = p(ctx).getInt("theme_mode", 0)
 
+    /** Ev beyni (PC'deki Ollama) adresi. Boşsa kapalı. Örn: http://192.168.1.50:11434 */
+    fun ollamaHost(ctx: Context): String =
+        p(ctx).getString("ollama_host", "") ?: ""
+
+    fun setOllamaHost(ctx: Context, v: String) {
+        p(ctx).edit().putString("ollama_host", v.trim()).apply()
+    }
+
     fun cycleTheme(ctx: Context): Int {
         val next = (themeMode(ctx) + 1) % 3
         p(ctx).edit().putInt("theme_mode", next).apply()

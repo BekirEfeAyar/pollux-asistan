@@ -1012,8 +1012,56 @@ async function pollinationsAsk(prompt, ms) {
   }
   return null;
 }
+// Ev veri merkezi: Ollama (localhost:11434). Yoksa sessizce atlanir.
+const LOCAL_MODEL = process.env.POLLUX_MODEL || 'qwen2.5:7b-instruct';
+function postJson(host, port, pth, obj, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const data = JSON.stringify(obj);
+    const req = require('http').request({
+      host, port, path: pth, method: 'POST', agent: false,
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
+    }, (res) => {
+      if (res.statusCode < 200 || res.statusCode >= 300) { res.resume(); reject(new Error('HTTP ' + res.statusCode)); return; }
+      let d = '';
+      res.setEncoding('utf8');
+      res.on('data', (c) => { d += c; });
+      res.on('end', () => resolve(d));
+    });
+    req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+    req.on('error', reject);
+    req.setTimeout(timeoutMs);
+    req.write(data);
+    req.end();
+  });
+}
+async function ollamaUp() {
+  try {
+    await postJson('127.0.0.1', 11434, '/api/show', { name: LOCAL_MODEL }, 3000);
+    return true;
+  } catch (e) {
+    try {
+      const t = await get('http://127.0.0.1:11434/api/tags', 3000);
+      const o = JSON.parse(t);
+      return !!(o && o.models && o.models.some((m) => (m.name || '').startsWith(LOCAL_MODEL.split(':')[0])));
+    } catch (e2) { return false; }
+  }
+}
+async function ollamaAsk(prompt) {
+  try {
+    if (!(await ollamaUp())) return null;
+    const t = await postJson('127.0.0.1', 11434, '/api/generate', {
+      model: LOCAL_MODEL, prompt, stream: false,
+      system: (typeof personaPrompt === 'function' ? personaPrompt() : '') +
+        'Her zaman akıcı Türkçe cevap ver.',
+      options: { num_predict: 600 },
+    }, 180000);
+    const o = JSON.parse(t);
+    const text = (o.response || '').trim();
+    return text.length > 20 ? text.slice(0, 2500) : null;
+  } catch (e) { return null; }
+}
 async function llmAsk(prompt) {
-  return (await duckChat(prompt)) || (await pollinationsAsk(prompt));
+  return (await ollamaAsk(prompt)) || (await duckChat(prompt)) || (await pollinationsAsk(prompt));
 }
 // "X ile Y farki" tarzi karsilastirma: iki tarafi ayri arastirip karsilastir
 async function compareFlow(f, raw) {

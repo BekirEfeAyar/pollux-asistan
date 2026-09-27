@@ -452,11 +452,12 @@ class Researcher(private val context: Context) {
         }
     }
 
-    private fun duckChat(prompt: String): String? {
-        val vqd = duckStatus() ?: return null
-        return try {
+    private fun duckChat(prompt: String, models: List<String> = LLM_MODELS): String? {
+        for (model in models) {
+            val vqd = duckStatus() ?: continue
+            try {
             val body = JSONObject()
-                .put("model", "openai/gpt-4o-mini")
+                .put("model", model)
                 .put("messages", org.json.JSONArray().put(JSONObject().put("role", "user").put("content", prompt)))
                 .toString()
             val conn = (URL("https://duckduckgo.com/duckchat/v1/chat").openConnection() as HttpURLConnection).apply {
@@ -470,7 +471,7 @@ class Researcher(private val context: Context) {
                 setRequestProperty("Accept", "text/event-stream")
             }
             conn.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(body) }
-            if (conn.responseCode !in 200..299) return null
+            if (conn.responseCode !in 200..299) continue
             val text = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
             var best = ""
             for (line in text.split("\n")) {
@@ -487,10 +488,19 @@ class Researcher(private val context: Context) {
                 } catch (_: Exception) {}
             }
             best = best.trim()
-            if (best.length > 20) best.take(2500) else null
-        } catch (_: Exception) {
-            null
-        }
+            if (best.length > 20) return best.take(2500)
+        } catch (_: Exception) { /* siradaki model */ }
+    }
+        return null
+    }
+
+    companion object {
+        /** Denenen LLM modelleri (sirayla). */
+        private val LLM_MODELS = listOf(
+            "openai/gpt-4o-mini",
+            "meta/llama-3.1-70b-instruct",
+            "mistralai/mistral-small-24b-instruct"
+        )
     }
 
     private fun pollinationsAsk(prompt: String): String? {

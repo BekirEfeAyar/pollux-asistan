@@ -950,12 +950,14 @@ async function duckStatus() {
     return r['x-vqd-4'] || r['x-vqd-hash-1'] || null;
   } catch (e) { return null; }
 }
-async function duckChat(prompt) {
-  const vqd = await duckStatus();
-  if (!vqd) return null;
+async function duckChat(prompt, models) {
+  const list = models && models.length ? models : LLM_MODELS;
+  for (const model of list) {
+    const vqd = await duckStatus();
+    if (!vqd) continue;
   try {
     const body = JSON.stringify({
-      model: 'openai/gpt-4o-mini',
+      model,
       messages: [{ role: 'user', content: prompt }],
     });
     const t = await new Promise((resolve, reject) => {
@@ -992,9 +994,14 @@ async function duckChat(prompt) {
       } catch (e) {}
     }
     best = best.trim();
-    return best.length > 20 ? best.slice(0, 2500) : null;
-  } catch (e) { return null; }
+    const out = best.length > 20 ? best.slice(0, 2500) : null;
+    if (out) return out;
+  } catch (e) { /* siradaki model */ }
+  }
+  return null;
 }
+// Denenen LLM modelleri (sirayla)
+const LLM_MODELS = ['openai/gpt-4o-mini', 'meta/llama-3.1-70b-instruct', 'mistralai/mistral-small-24b-instruct'];
 async function pollinationsAsk(prompt, ms) {
   for (let i = 0; i < 2; i++) {
     try {
@@ -1008,10 +1015,48 @@ async function pollinationsAsk(prompt, ms) {
 async function llmAsk(prompt) {
   return (await duckChat(prompt)) || (await pollinationsAsk(prompt));
 }
+// "X ile Y farki" tarzi karsilastirma: iki tarafi ayri arastirip karsilastir
+async function compareFlow(f, raw) {
+  const m = /(.+?)\s+ile\s+(.+?)\s+(fark|farki|farkı|karsilastir|karsilastirma|mukayese|ayirt|ayir)/.exec(f);
+  if (!m) return null;
+  const a = m[1].trim(), b = m[2].trim();
+  if (a.length < 2 || b.length < 2 || !(await hasInternet())) return null;
+  const [ra, rb] = await Promise.all([researcher(a), researcher(b)]);
+  if (!ra && !rb) return null;
+  const ctxA = ra ? (ra.title + ': ' + ra.answer).slice(0, 1500) : '(kaynak bulunamadı)';
+  const ctxB = rb ? (rb.title + ': ' + rb.answer).slice(0, 1500) : '(kaynak bulunamadı)';
+  const ctx = 'A) ' + a + ':\n' + ctxA + '\n\nB) ' + b + ':\n' + ctxB;
+  const synth = await synthesizeTR(a + ' ile ' + b + ' arasındaki fark nedir', ctx, ((ra && ra.source) || '') + ' + ' + ((rb && rb.source) || ''));
+  const urls = [];
+  for (const r of [ra, rb]) {
+    if (!r) continue;
+    const us = (r.urls && r.urls.length ? r.urls : (r.url ? [r.url] : []));
+    for (const u of us) if (!urls.includes(u)) urls.push(u);
+  }
+  const body = synth || ('A) ' + ctxA + '\n\nB) ' + ctxB);
+  const full = body + '\n(Karşılaştırma)' + (urls.length ? '\nBağlantılar:\n' + urls.slice(0, 5).join('\n') : '');
+  learn(a + ' ile ' + b + ' fark', full);
+  lastTopic = a + ' ile ' + b;
+  lastTitle = '';
+  lastContext = ctxA + '\n' + ctxB;
+  pushQA(raw, full);
+  return full;
+}
+// Son sohbetler (sentezde baglam icin, en fazla 2)
+const lastQA = [];
+function pushQA(q, a) {
+  try {
+    lastQA.unshift({ q: String(q).slice(0, 200), a: String(a).slice(0, 500) });
+    while (lastQA.length > 2) lastQA.pop();
+  } catch (e) {}
+}
 // Kaynaklara dayali Turkce sentez (RAG): duzenli, maddeli, girissiz
 async function synthesizeTR(question, context, sourceNames) {
   if (!context || context.trim().length < 60) return null;
-  const ctx = context.trim().slice(0, 3000);
+  let ctx = context.trim().slice(0, 3000);
+  if (lastQA.length) {
+    ctx += '\n\nÖNCEKİ SOHBET:\n' + lastQA.map((x) => 'Soru: ' + x.q + '\nCevap: ' + x.a).join('\n');
+  }
   const prompt = personaPrompt() +
     'Aşağıdaki KAYNAKLARA dayanarak soruyu Türkçe cevapla. Kurallar: düzenli ve ayrıntılı ol, ' +
     'gereken yerde madde kullan, giriş cümlesi kurma, kaynaksız bilgi uydurma, cevabın sonunda ' +
@@ -1153,6 +1198,55 @@ const PRON_TOKS = new Set(['o', 'bu', 'bunu', 'bunun', 'onun', 'onlar', 'peki', 
 const CREDIT = "Beni yapan muazzam kişi Bekir Efe AYAR'dır, isteyenler için Instagram hesabı şudur: https://www.instagram.com/efebekir_slm/";
 function todayTR() {
   return new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' });
+}
+// Tekil deterministik niyetler (coklu soru icin de kullanilir)
+function timeAnswer(f, tokens, now) {
+  if (!((f.includes('saat') && f.includes('kac')) || f === 'saat' || f === 'saat kac')) return null;
+  const wc = worldClock(f);
+  if (wc) return wc;
+  return 'Saat ' + now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+}
+function dateAnswer(f, tokens, now) {
+  if (f.includes('tarihte bugun') || f.includes('bugun tarihte ne oldu')) {
+    const md = String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+    const ev = { '01-01': 'Yılbaşı. Yeni yılın ilk günü.', '03-18': '18 Mart Çanakkale Zaferi.', '04-23': "23 Nisan Ulusal Egemenlik ve Çocuk Bayramı. TBMM 1920'de bugün açıldı.", '05-19': "19 Mayıs Atatürk'ü Anma, Gençlik ve Spor Bayramı.", '08-30': '30 Ağustos Zafer Bayramı.', '10-29': "29 Ekim Cumhuriyet Bayramı.", '11-10': "10 Kasım Atatürk'ü Anma Günü." }[md];
+    return ev || 'Bugüne özel kayıtlı bir olay yok. Başka gün de sorabilirsin.';
+  }
+  if (f.includes('tarih') || f.includes('bugun ne') || f.includes('gunlerden') || f.includes('hangi gundeyiz')) return 'Bugün ' + todayTR();
+  if (f.includes('hangi yil') || f === 'yil kac' || f.includes('kac yilindayiz')) return 'Şu an ' + now.toLocaleDateString('tr-TR', { year: 'numeric' }) + ' yılındayız.';
+  if (f.includes('hangi ay') || f === 'ay kac') return 'Şu an ' + now.toLocaleDateString('tr-TR', { month: 'long' }) + ' ayındayız.';
+  if (tokens.includes('yarin') && (f.includes('gun') || tokens.includes('ne') || tokens.includes('hangi') || tokens.length <= 2)) {
+    const t = new Date(now.getTime() + 86400000);
+    return 'Yarın ' + t.toLocaleDateString('tr-TR', { weekday: 'long' }) + '.';
+  }
+  if (tokens.includes('dun') && (f.includes('gun') || tokens.includes('ne') || tokens.includes('hangi') || tokens.length <= 2)) {
+    const t = new Date(now.getTime() - 86400000);
+    return 'Dün ' + t.toLocaleDateString('tr-TR', { weekday: 'long' }) + ' idi.';
+  }
+  const monthDays = { ocak: 31, subat: 28, mart: 31, nisan: 30, mayis: 31, haziran: 30, temmuz: 31, agustos: 31, eylul: 30, ekim: 31, kasim: 30, aralik: 31 };
+  const monthNames = { ocak: 'Ocak', subat: 'Şubat', mart: 'Mart', nisan: 'Nisan', mayis: 'Mayıs', haziran: 'Haziran', temmuz: 'Temmuz', agustos: 'Ağustos', eylul: 'Eylül', ekim: 'Ekim', kasim: 'Kasım', aralik: 'Aralık' };
+  for (const mth in monthDays) {
+    if (f.includes(mth) && (f.includes('kac gun') || f.includes('kac cekiyor') || f.includes('kac ceker'))) {
+      return monthNames[mth] + ' ayı ' + monthDays[mth] + ' gün çeker.' + (mth === 'subat' ? ' Artık yıllarda 29 çeker.' : '');
+    }
+  }
+  return null;
+}
+// "12 arti 5 ve ankara hava durumu" gibi ikili sorular (deterministik niyetler)
+function multiAnswer(raw) {
+  const parts = raw.split(/\s+ve\s+|\s+ayrıca\s*,?\s*|\s+ayrica\s*,?\s*/i).map((s) => s.trim()).filter(Boolean);
+  if (parts.length !== 2) return null;
+  const now = new Date();
+  const outs = [];
+  for (const p of parts) {
+    const pf = fold(p.toLocaleLowerCase('tr'));
+    const pt = pf.split(' ').map((t) => t.trim()).filter(Boolean);
+    const one = mathAnswer(pf) || unitAnswer(pf) || tempAnswer(pf) ||
+      timeAnswer(pf, pt, now) || dateAnswer(pf, pt, now);
+    if (!one) return null;
+    outs.push(one);
+  }
+  return outs.join('\n\n');
 }
 async function answer(raw) {
   const cmd = raw.toLocaleLowerCase('tr').trim();
@@ -1394,6 +1488,11 @@ async function answer(raw) {
     return 'Güncel kurlar (TCMB satış):\n' + keys.map((k) => '- ' + names[k] + ': ' + r[k] + ' TL').join('\n');
   }
 
+  // coklu niyet: "12 arti 5 ve saat kac" -> ikisine de cevap
+  try {
+    const multi = multiAnswer(raw);
+    if (multi) return multi;
+  } catch (e) {}
   // hesap + birim + sicaklik ONCE (saat/tarih niyetlerini ezmesin: "1 saat kac dakika")
   const math = mathAnswer(f);
   if (math) return math;
@@ -1404,27 +1503,11 @@ async function answer(raw) {
 
   // tarih / saat
   const now = new Date();
-  if ((f.includes('saat') && f.includes('kac')) || f === 'saat' || f === 'saat kac') {
-    const wc = worldClock(f);
-    if (wc) return wc;
-    return 'Saat ' + now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-  }
-  if (f.includes('tarihte bugun') || f.includes('bugun tarihte ne oldu')) {
-    const md = String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
-    const ev = { '01-01': 'Yılbaşı. Yeni yılın ilk günü.', '03-18': '18 Mart Çanakkale Zaferi.', '04-23': "23 Nisan Ulusal Egemenlik ve Çocuk Bayramı. TBMM 1920'de bugün açıldı.", '05-19': "19 Mayıs Atatürk'ü Anma, Gençlik ve Spor Bayramı.", '08-30': '30 Ağustos Zafer Bayramı.', '10-29': "29 Ekim Cumhuriyet Bayramı.", '11-10': "10 Kasım Atatürk'ü Anma Günü." }[md];
-    return ev || 'Bugüne özel kayıtlı bir olay yok. Başka gün de sorabilirsin.';
-  }
-  if (f.includes('tarih') || f.includes('bugun ne') || f.includes('gunlerden') || f.includes('hangi gundeyiz')) return 'Bugün ' + todayTR();
-  if (f.includes('hangi yil') || f === 'yil kac' || f.includes('kac yilindayiz')) return 'Şu an ' + now.toLocaleDateString('tr-TR', { year: 'numeric' }) + ' yılındayız.';
-  if (f.includes('hangi ay') || f === 'ay kac') return 'Şu an ' + now.toLocaleDateString('tr-TR', { month: 'long' }) + ' ayındayız.';
-  // "dun"/"yarin" kelime olarak gecmeli ("dunya"nin icindeki "dun" tuzagi)
-  if (tokens.includes('yarin') && (f.includes('gun') || tokens.includes('ne') || tokens.includes('hangi') || tokens.length <= 2)) {
-    const t = new Date(now.getTime() + 86400000);
-    return 'Yarın ' + t.toLocaleDateString('tr-TR', { weekday: 'long' }) + '.';
-  }
-  if (tokens.includes('dun') && (f.includes('gun') || tokens.includes('ne') || tokens.includes('hangi') || tokens.length <= 2)) {
-    const t = new Date(now.getTime() - 86400000);
-    return 'Dün ' + t.toLocaleDateString('tr-TR', { weekday: 'long' }) + ' idi.';
+  {
+    const ta = timeAnswer(f, tokens, now);
+    if (ta) return ta;
+    const da = dateAnswer(f, tokens, now);
+    if (da) return da;
   }
   const monthDays = { ocak: 31, subat: 28, mart: 31, nisan: 30, mayis: 31, haziran: 30, temmuz: 31, agustos: 31, eylul: 30, ekim: 31, kasim: 30, aralik: 31 };
   const monthNames = { ocak: 'Ocak', subat: 'Şubat', mart: 'Mart', nisan: 'Nisan', mayis: 'Mayıs', haziran: 'Haziran', temmuz: 'Temmuz', agustos: 'Ağustos', eylul: 'Eylül', ekim: 'Ekim', kasim: 'Kasım', aralik: 'Aralık' };
@@ -1520,9 +1603,23 @@ async function answer(raw) {
     return 'Gündemde öne çıkanlar:\n' + heads.map((h, i) => (i + 1) + ') ' + h.title + (h.source ? ' (' + h.source + ')' : '')).join('\n');
   }
   // "arastir" denirse DOSDOGRU arastirmaya git (bankadaki kisa cevap yetmez)
+  // karsilastirma da bankadan once denenir (uzun banka cevabi korunur)
+  let kb0 = null;
+  try {
+    kb0 = findKnowledge(query, learned.map((e) => ({ k: [e.q], a: e.a })));
+  } catch (e) {}
   if (!forceResearch) {
-    const kb = findKnowledge(query, learned.map((e) => ({ k: [e.q], a: e.a })));
-    if (kb) return kb;
+    const cmpM = /(.+?)\s+ile\s+(.+?)\s+(fark|farki|farkı|karsilastir|karsilastirma|mukayese|ayirt|ayir)\b/.exec(f);
+    if (cmpM && (!kb0 || kb0.length < 200) && (await hasInternet())) {
+      try {
+        const cmp = await compareFlow(f, raw);
+        if (cmp) {
+          pushQA(raw, cmp);
+          return cmp;
+        }
+      } catch (e) {}
+    }
+    if (kb0) return kb0;
   }
 
   // konum: bilgi bankasinda yoksa haritada goster
@@ -1564,6 +1661,7 @@ async function answer(raw) {
     lastTopic = cleanTopic(query) || query;
     lastTitle = r.title;
     lastContext = r.answer;
+    pushQA(query, full);
     return full;
   }
   const aiText = await aiAsk(query);
@@ -1572,6 +1670,7 @@ async function answer(raw) {
     lastTopic = cleanTopic(query) || query;
     lastTitle = '';
     lastContext = '';
+    pushQA(query, aiText);
     return aiText + '\n(Yapay zeka yanıtı)';
   }
   // Zorunlu arastirma bile bos donduyse bankadaki kisa cevaba dus

@@ -517,64 +517,9 @@ class Researcher(private val context: Context) {
         return null
     }
 
-    /** Ev beyni açıksa (Panelden adres girildiyse) ona sor. Model: qwen2.5:7b-instruct */
-    private fun ollamaAsk(prompt: String): String? {
-        val host = try {
-            Prefs.ollamaHost(context).trim().trimEnd('/')
-        } catch (_: Exception) {
-            ""
-        }
-        if (host.isBlank()) return null
-        return try {
-            val body = JSONObject()
-                .put("model", "qwen2.5:7b-instruct")
-                .put("prompt", prompt)
-                .put("stream", false)
-                .put("system", personaLine() + "Her zaman akıcı Türkçe cevap ver.")
-                .put("options", JSONObject().put("num_predict", 600))
-                .toString()
-            val conn = (URL("$host/api/generate").openConnection() as HttpURLConnection).apply {
-                connectTimeout = 5000
-                readTimeout = 180000
-                requestMethod = "POST"
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json")
-            }
-            conn.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(body) }
-            if (conn.responseCode !in 200..299) return null
-            val text = JSONObject(conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() })
-                .optString("response", "").trim()
-            if (text.length > 20) text.take(2500) else null
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    /** Paneldeki "Test" düğmesi için hızlı bağlantı kontrolü. */
-    fun ollamaTest(host: String): Boolean {
-        return try {
-            val clean = host.trim().trimEnd('/')
-            if (clean.isBlank()) return false
-            val conn = (URL("$clean/api/tags").openConnection() as HttpURLConnection).apply {
-                connectTimeout = 5000
-                readTimeout = 5000
-                requestMethod = "GET"
-            }
-            conn.connect()
-            conn.responseCode in 200..299
-        } catch (_: Exception) {
-            false
-        }
-    }
-
-    private fun personaLine(): String {
-        return "Sen Pollux adında bir asistansın. Karakterin: sıcak, esprili ama saygılı, " +
-            "meraklı, bazen soru soran, robot gibi değil arkadaş gibi konuşan. "
-    }
-
     private fun llmAsk(prompt: String): String? {
         return try {
-            ollamaAsk(prompt) ?: duckChat(prompt) ?: pollinationsAsk(prompt)
+            duckChat(prompt) ?: pollinationsAsk(prompt)
         } catch (_: Exception) {
             try {
                 pollinationsAsk(prompt)

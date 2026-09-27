@@ -29,35 +29,6 @@ class DashboardActivity : AppCompatActivity() {
         val statsText: TextView = findViewById(R.id.statsText)
         val usersList: ListView = findViewById(R.id.usersList)
         val questionsList: ListView = findViewById(R.id.questionsList)
-        val ollamaEdit: android.widget.EditText = findViewById(R.id.ollamaEdit)
-        val ollamaSave: android.widget.Button = findViewById(R.id.ollamaSave)
-        ollamaEdit.setText(Prefs.ollamaHost(this))
-        ollamaSave.setOnClickListener {
-            val v = ollamaEdit.text.toString().trim().trimEnd('/')
-            Prefs.setOllamaHost(this, v)
-            Toast.makeText(
-                this,
-                if (v.isBlank()) "Ev beyni kapatıldı." else "Kaydedildi. Test ediliyor...",
-                Toast.LENGTH_SHORT
-            ).show()
-            if (v.isNotBlank()) {
-                Thread {
-                    val ok = try {
-                        Researcher(applicationContext).ollamaTest(v)
-                    } catch (_: Exception) {
-                        false
-                    }
-                    runOnUiThread {
-                        Toast.makeText(
-                            this,
-                            if (ok) "Bağlantı tamam, ev beyni aktif." else "Ulaşılamadı. Adres ve aynı Wi-Fi'yi kontrol et.",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                }.start()
-            }
-        }
-
         Thread {
             val db = DbHelper(this)
             val users = try { db.allUsers() } catch (_: Exception) { emptyList() }

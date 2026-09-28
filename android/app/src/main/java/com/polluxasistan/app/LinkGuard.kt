@@ -40,6 +40,33 @@ object LinkGuard {
     }
 
     fun normalize(raw: String): String? {
+        // Yapımcının link sayfası: uyarısız direkt açılan tek adres
+        return normalizeDirect(raw) ?: normalizeGeneral(raw)
+    }
+
+    const val MY_LINKS = "https://bekirefeayar.github.io/kisisel-linklerim/"
+
+    /** Uyarısız direkt açılan tek adres: yapımcının link sayfası. */
+    fun isDirect(rawUrl: String): Boolean {
+        return try {
+            var a = rawUrl.trim().trimEnd('/').lowercase()
+            var b = MY_LINKS.trimEnd('/')
+            if (!a.contains("://")) a = "https://$a"
+            a == b.lowercase()
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun normalizeDirect(raw: String): String? {
+        return try {
+            if (isDirect(raw)) MY_LINKS else null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun normalizeGeneral(raw: String): String? {
         var u = raw.trim()
         if (u.isEmpty()) return null
         if (!u.contains("://")) u = "https://$u"
@@ -56,6 +83,10 @@ object LinkGuard {
 
     /** Bağlantıya basılınca çağrılır: güvendeyse direkt açar, yoksa uyarır. */
     fun onLink(activity: Activity, rawUrl: String) {
+        if (isDirect(rawUrl)) {
+            launchBrowser(activity, MY_LINKS)
+            return
+        }
         val url = normalize(rawUrl)
         if (url == null) {
             Toast.makeText(activity, "Geçersiz bağlantı.", Toast.LENGTH_SHORT).show()

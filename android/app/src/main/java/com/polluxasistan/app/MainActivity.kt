@@ -84,7 +84,7 @@ class MainActivity : AppCompatActivity() {
                 R.id.nav_links -> {
                     drawer.closeDrawers()
                     try {
-                        LinkGuard.onLink(this, "https://bekirefeayar.github.io/kisisel-linklerim/")
+                        LinkGuard.onLink(this, LinkGuard.MY_LINKS)
                     } catch (_: Exception) {}
                     true
                 }

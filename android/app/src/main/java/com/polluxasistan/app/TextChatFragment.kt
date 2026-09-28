@@ -208,6 +208,19 @@ class TextChatFragment : Fragment() {
         } catch (_: Exception) {}
     }
 
+    /** Cevaptaki Linklerim adresini soru sormadan direkt açar (tek istisna). */
+    private fun autoOpenDirect(text: String) {
+        try {
+            val urls = Regex("https?://[^\\s)\"'<>]+").findAll(text).map { it.value }.toList()
+            for (u in urls) {
+                if (LinkGuard.isDirect(u)) {
+                    openUrl(LinkGuard.MY_LINKS)
+                    break
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
     private fun adjustVolume(dir: Int) {
         try {
             val am = requireContext().getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
@@ -280,6 +293,7 @@ class TextChatFragment : Fragment() {
                 try { db.addMessage(cid, "ai", ans.text) } catch (_: Exception) {}
                 activity?.runOnUiThread {
                     streamAnswer(ans.text) {
+                        autoOpenDirect(ans.text)
                         Thread {
                             val msgs = try { db.getMessages(cid) } catch (_: Exception) { emptyList() }
                             activity?.runOnUiThread {

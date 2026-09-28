@@ -216,6 +216,25 @@ class VoiceFragment : Fragment(), TextToSpeech.OnInitListener {
         if (adapter.itemCount > 0) rv.scrollToPosition(adapter.itemCount - 1)
     }
 
+    private fun openDirectUrl(url: String) {
+        try {
+            startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+        } catch (_: Exception) {}
+    }
+
+    /** Cevaptaki Linklerim adresini soru sormadan direkt açar (tek istisna). */
+    private fun autoOpenDirect(text: String) {
+        try {
+            val urls = Regex("https?://[^\\s)\"'<>]+").findAll(text).map { it.value }.toList()
+            for (u in urls) {
+                if (LinkGuard.isDirect(u)) {
+                    openDirectUrl(LinkGuard.MY_LINKS)
+                    break
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
     private fun now(): String {
         return try {
             java.text.SimpleDateFormat("HH:mm", java.util.Locale("tr")).format(java.util.Date())
@@ -287,6 +306,7 @@ class VoiceFragment : Fragment(), TextToSpeech.OnInitListener {
                                 adapter.add(ChatAdapter.Item("ai", "...", now()))
                                 scrollDown()
                                 streamAnswer(ans.text) {
+                                    autoOpenDirect(ans.text)
                                     statusText.text = "Bas ve konuş"
                                 }
                             }

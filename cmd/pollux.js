@@ -1194,8 +1194,21 @@ async function newsSearch(topic, n) {
 let lastTopic = '', lastTitle = '', lastContext = '';
 const PRON_TOKS = new Set(['o', 'bu', 'bunu', 'bunun', 'onun', 'onlar', 'peki', 'hmm', 'ee', 'sey', 'ya']);
 
+// Yapimcinin link sayfasi: uyarisiz direkt acilir (tek istisna)
+const MY_LINKS = 'https://bekirefeayar.github.io/kisisel-linklerim/';
+function normUrl(u) {
+  try {
+    let s = String(u).trim().replace(/\/+$/, '');
+    const m = /^https?:\/\/([^/]+)(\/.*)?$/i.exec(s);
+    if (!m) return s.toLowerCase();
+    return 'https://' + m[1].toLowerCase() + (m[2] || '');
+  } catch (e) { return String(u); }
+}
+function isDirectUrl(u) {
+  return normUrl(u) === normUrl(MY_LINKS);
+}
 // ---------- ana cozumleme ----------
-const CREDIT = "Beni yapan muazzam kişi Bekir Efe AYAR'dır, isteyenler için Instagram hesabı şudur: https://www.instagram.com/efebekir_slm/";
+const CREDIT = "Beni yapan muazzam kişi Bekir Efe AYAR'dır, linklerim şurada: " + MY_LINKS;
 function todayTR() {
   return new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' });
 }
@@ -1322,6 +1335,8 @@ async function answer(raw) {
   }
 
   // Yapımcı / moderatör
+  if (f.includes('linklerim') || f.includes('linkler') || f.includes('my links'))
+    return 'Linklerin burada: ' + MY_LINKS;
   const whoMade = f.includes('kim') && (f.includes('yapti') || f.includes('yapan') || f.includes('gelistir') ||
     f.includes('kodla') || f.includes('yazdi') || tokens.includes('sahibin') ||
     tokens.includes('sahibi') || f.includes('moderator') || f.includes('yapimci'));
@@ -1826,7 +1841,7 @@ function openUrl(url) {
 // ---------- TUI (fotograftaki tasarim) ----------
 // Kullanim: pollux --tui
 // Fareyle "My Links"e tiklanir (Windows Terminal destekler), klavyeden /link de acar.
-const LINKS_URL = 'https://bekirefeayar.github.io/kisisel-linklerim/';
+const LINKS_URL = MY_LINKS;
 // Nokta-matris logo (fotograf: yogun nokta + hafif golge)
 const LOGO_RAW = [
   '#####  ###  #      #      #   # #   #',
@@ -2059,9 +2074,12 @@ async function tuiLoop() {
         step();
       });
       const urls = extractUrls(out);
-      if (urls.length) {
-        state.pendingUrls = urls;
-        push('[!] Açmak için numarayı yaz (' + urls.map((u, i) => (i + 1) + ') ' + u).join('  ') + ')', 'a');
+      const direct = urls.filter(isDirectUrl);
+      const rest = urls.filter((u) => !isDirectUrl(u));
+      for (const u of direct) openUrl(u);
+      if (rest.length) {
+        state.pendingUrls = rest;
+        push('[!] Açmak için numarayı yaz (' + rest.map((u, i) => (i + 1) + ') ' + u).join('  ') + ')', 'a');
       }
     } catch (e) {
       state.busy = false;
@@ -2178,11 +2196,14 @@ async function main() {
     await streamWords(out, 18, (chunk) => process.stdout.write(chunk));
     process.stdout.write('\n');
     const urls = extractUrls(out);
-    if (urls.length && autoOpen) {
-      for (const u of urls) openUrl(u);
-    } else if (urls.length) {
+    const direct = urls.filter(isDirectUrl);
+    const rest = urls.filter((u) => !isDirectUrl(u));
+    for (const u of direct) openUrl(u);
+    if (rest.length && autoOpen) {
+      for (const u of rest) openUrl(u);
+    } else if (rest.length) {
       console.log('\n[!] Bu cevap bağlantı içeriyor. Açmak için --ac ekle: pollux --ac "soru"');
-      urls.forEach((u) => console.log('    ' + u));
+      rest.forEach((u) => console.log('    ' + u));
     }
     return;
   }
@@ -2199,16 +2220,19 @@ async function main() {
     await streamWords(out, 18, (chunk) => process.stdout.write(chunk));
     process.stdout.write('\n');
     const urls = extractUrls(out);
-    if (!urls.length) return ask();
+    const direct = urls.filter(isDirectUrl);
+    const rest = urls.filter((u) => !isDirectUrl(u));
+    for (const u of direct) openUrl(u);
+    if (!rest.length) return ask();
     console.log('[!] Uygulamadan ayrılıyorsun. Bu bağlantı seni şu siteye götürüyor:');
-    urls.forEach((u, i) => console.log('    [' + (i + 1) + '] ' + u));
+    rest.forEach((u, i) => console.log('    [' + (i + 1) + '] ' + u));
     rl.question('Açayım mı? (numara / hepsi / geç) ', (sel) => {
       const s = sel.trim().toLowerCase();
       if (s === 'hepsi' || s === 'h' || s === 'hepsini ac') {
-        urls.forEach(openUrl);
+        rest.forEach(openUrl);
       } else {
         const n = parseInt(s, 10);
-        if (n >= 1 && n <= urls.length) openUrl(urls[n - 1]);
+        if (n >= 1 && n <= rest.length) openUrl(rest[n - 1]);
       }
       ask();
     });

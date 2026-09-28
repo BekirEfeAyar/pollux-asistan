@@ -286,7 +286,12 @@ class ChatBrain(
             )
         if (whoMade) {
             return Answer(
-                "Beni yapan muazzam kişi Bekir Efe AYAR'dır, isteyenler için Instagram hesabı şudur: https://www.instagram.com/efebekir_slm/"
+                "Beni yapan muazzam kişi Bekir Efe AYAR'dır, linklerim şurada: https://bekirefeayar.github.io/kisisel-linklerim/"
+            )
+        }
+        if (f.contains("linklerim") || f.contains("linkler") || f.contains("my links")) {
+            return Answer(
+                "Linklerin burada: https://bekirefeayar.github.io/kisisel-linklerim/"
             )
         }
         if (f.contains("saka yap") || f.contains("fikra anlat") || f.contains("bana guldur") || f.contains("komik bir sey") || f.contains("espri")) {

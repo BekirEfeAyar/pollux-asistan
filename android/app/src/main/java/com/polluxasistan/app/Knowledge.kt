@@ -33,6 +33,13 @@ class Knowledge(private val ctx: Context) {
         }
     }
 
+    /** Uygulama acilisinda arka planda cagrilir: ilk soru beklemesin. */
+    fun warmup() {
+        try {
+            entries.size
+        } catch (_: Exception) {}
+    }
+
     fun find(rawQuery: String, extra: List<Entry> = emptyList()): String? {
         // "Fransa'nin" -> "Fransa": ozel isim eklerini at
         val cleaned = rawQuery.replace(Regex("([A-Za-zÇçĞğİıÖöŞşÜü]+)'[A-Za-zÇçĞğİıÖöŞşÜü]*"), "$1")

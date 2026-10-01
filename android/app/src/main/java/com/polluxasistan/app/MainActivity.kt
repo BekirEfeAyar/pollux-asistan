@@ -33,6 +33,11 @@ class MainActivity : AppCompatActivity() {
         ThemeHelper.apply(this)
         super.onCreate(savedInstanceState)
         Thread { Prefs.ensureSeedAccount(this) }.start()
+        Thread {
+            try {
+                Knowledge(applicationContext).warmup()
+            } catch (_: Exception) {}
+        }.start()
         if (Prefs.sessionEmail(this) == null) {
             startActivity(Intent(this, LoginActivity::class.java))
             finish()

@@ -294,11 +294,11 @@ function searchPool(q, cleaned, all) {
             if (a.length >= 3 && (b.startsWith(a) || a.startsWith(b)) && Math.abs(b.length - a.length) <= 2) { singleHit = e; break; }
           }
           // Yazım toleransı: uzun tek kelime, kısa soru ("kanal"->"kangal")
-          // Tek kelimelik soruda 2 harfe kadar ("kanagl"->"kangal")
-          if (!singleHit && kt.length >= 5 && qtokens.length <= 2) {
-            const tol1 = qtokens.length === 1 ? 2 : 1;
+          // Tek kelimelik soruda 1 harfe kadar ("kanagl"->"kangal")
+          if (!singleHit && kt.length >= 6 && qtokens.length <= 2) {
+            const tol1 = qtokens.length === 1 ? 1 : 0;
             for (const qw of qtokens) {
-              if (qw.length >= 4 && Math.abs(qw.length - kt.length) <= 1 && lev(qw, kt) <= tol1) { singleHit = e; break; }
+              if (qw.length >= 5 && Math.abs(qw.length - kt.length) <= 1 && lev(qw, kt) <= tol1) { singleHit = e; break; }
             }
           }
         }

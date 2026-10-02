@@ -38,6 +38,27 @@ class MainActivity : AppCompatActivity() {
                 Knowledge(applicationContext).warmup()
             } catch (_: Exception) {}
         }.start()
+        // Tam veri seti yoksa indir
+        Thread {
+            try {
+                val k = Knowledge(applicationContext)
+                if (!k.hasFullDataset()) {
+                    k.downloadFullDataset({ pct, msg ->
+                        runOnUiThread {
+                            android.widget.Toast.makeText(this@MainActivity, msg, android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    }, { ok ->
+                        runOnUiThread {
+                            android.widget.Toast.makeText(
+                                this@MainActivity,
+                                if (ok) "Tam veri seti hazır (10M kayıt)" else "İndirme başarısız",
+                                android.widget.Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    })
+                }
+            } catch (_: Exception) {}
+        }.start()
         if (Prefs.sessionEmail(this) == null) {
             startActivity(Intent(this, LoginActivity::class.java))
             finish()

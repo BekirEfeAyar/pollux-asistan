@@ -1,7 +1,14 @@
 package com.polluxasistan.app
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.zip.GZIPInputStream
 
 /**
  * Paketlenmis cevrimdisi bilgi bankasi (assets/knowledge.json).
@@ -38,6 +45,57 @@ class Knowledge(private val ctx: Context) {
         try {
             entries.size
         } catch (_: Exception) {}
+    }
+
+    /**
+     * Tam veri seti (10M kayit) indirilebilir. Acilista 100K kayitla baslar,
+     * kullanici indirse 1GB gzip dosyasi cikarilir.
+     */
+    fun downloadFullDataset(onProgress: (Int, String) -> Unit, onDone: (Boolean) -> Unit) {
+        Thread {
+            try {
+                val url = URL("https://github.com/BekirEfeAyar/pollux-asistan/releases/download/v2.0.23-data/knowledge.json.gz")
+                val conn = (url.openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 30000
+                    readTimeout = 300000
+                    requestMethod = "GET"
+                }
+                val total = conn.contentLength
+                val tmpFile = File(ctx.filesDir, "knowledge.json.gz")
+                val out = FileOutputStream(tmpFile)
+                var downloaded = 0
+                conn.inputStream.use { input ->
+                    val buf = ByteArray(8192)
+                    var read: Int
+                    while (input.read(buf).also { read = it } != -1) {
+                        out.write(buf, 0, read)
+                        downloaded += read
+                        if (total > 0) {
+                            val pct = (downloaded * 100 / total).toInt()
+                            Handler(Looper.getMainLooper()).post { onProgress(pct, "İndiriliyor... %$pct") }
+                        }
+                    }
+                }
+                out.close()
+                // Gzip cikar
+                Handler(Looper.getMainLooper()).post { onProgress(100, "Açılıyor...") }
+                val jsonFile = File(ctx.filesDir, "knowledge.json")
+                GZIPInputStream(tmpFile.inputStream()).use { gz ->
+                    FileOutputStream(jsonFile).use { fo ->
+                        gz.copyTo(fo)
+                    }
+                }
+                tmpFile.delete()
+                Handler(Looper.getMainLooper()).post { onDone(true) }
+            } catch (e: Exception) {
+                Handler(Looper.getMainLooper()).post { onDone(false) }
+            }
+        }.start()
+    }
+
+    /** Tam veri seti yuklu mu? */
+    fun hasFullDataset(): Boolean {
+        return File(ctx.filesDir, "knowledge.json").exists()
     }
 
     fun find(rawQuery: String, extra: List<Entry> = emptyList()): String? {

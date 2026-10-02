@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const readline = require('readline');
+const zlib = require('zlib');
 
 const DIR = __dirname;
 function readJson(name, fallback) {
@@ -17,6 +18,29 @@ const KNOWLEDGE = readJson('knowledge.json', { entries: [] }).entries;
 const DICT = readJson('dict.json', { pairs: [] }).pairs;
 if (!KNOWLEDGE.length) console.error('UYARI: bilgi bankasi bos yuklendi!');
 if (!DICT.length) console.error('UYARI: sozluk bos yuklendi!');
+
+// Tam veri seti (10M kayit) indirilebilir
+const DATA_URL = 'https://github.com/BekirEfeAyar/pollux-asistan/releases/download/v2.0.23-data/knowledge.json.gz';
+function downloadFullDataset() {
+  return new Promise((resolve) => {
+    const tmpFile = path.join(DIR, 'knowledge.json.gz');
+    const out = fs.createWriteStream(tmpFile);
+    https.get(DATA_URL, (res) => {
+      if (res.statusCode !== 200) { out.end(); resolve(false); return; }
+      res.pipe(out);
+      out.on('finish', () => {
+        out.close();
+        try {
+          const gz = fs.readFileSync(tmpFile);
+          const json = zlib.gunzipSync(gz);
+          fs.writeFileSync(path.join(DIR, 'knowledge.json'), json);
+          fs.unlinkSync(tmpFile);
+          resolve(true);
+        } catch (e) { resolve(false); }
+      });
+    }).on('error', () => resolve(false));
+  });
+}
 function userDataDir() {
   // Kullaniciya ozel yazilabilir klasor (global npm kurulumunda paket klasoru salt-okunur olabilir)
   try {

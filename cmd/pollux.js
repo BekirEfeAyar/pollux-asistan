@@ -2184,7 +2184,7 @@ async function tuiLoop() {
     tabs: [], active: 0, tabN: 0,
     status: "My Links'e tıkla / F1 / /link • PgUp/PgDn: kaydır • çıkış: /cikis",
     statusUntil: 0, busy: false,
-    linkRow: 0, linkCol: 0, dots: 0,
+    linkRow: 0, linkCol: 0, dots: 0, renaming: false,
   };
   const cur = () => state.tabs[state.active];
   function newTabObj(name) {
@@ -2230,18 +2230,20 @@ async function tuiLoop() {
     let x = 1;
     state.tabs.forEach((t, i) => {
       const label = ' ' + (t.name || ('Sohbet ' + (i + 1))).slice(0, 16) + ' ';
+      const llen = visibleLen(label);
       const x0 = x;
       if (i === state.active) {
-        s += GOLD + '▎' + RESET + BRIGHT + label + RESET + GOLD + '▎' + RESET;
-        x += 2 + visibleLen(label);
+        s += GOLD + '▎' + RESET + BRIGHT + label + RESET + MRED + '×' + RESET + GOLD + '▎' + RESET;
+        x += 2 + llen + 1;
       } else {
-        s += DIM + label + RESET + DIM + '│' + RESET;
-        x += visibleLen(label) + 1;
+        s += DIM + label + RESET + MRED + '×' + RESET + DIM + '│' + RESET;
+        x += llen + 2;
       }
-      state.tabRegions.push({ i, x0, x1: x });
+      state.tabRegions.push({ i, x0, x1: x - 2, close: false });
+      state.tabRegions.push({ i, x0: x - 2, x1: x - 1, close: true });
     });
     s += ' ' + DIM + '+' + RESET;
-    const hint = 'Ctrl+T yeni • Ctrl+W kapat • Ctrl+←/→ geç';
+    const hint = 'Ctrl+T yeni • Ctrl+W kapat • Ctrl+←/→ geç • F2 ad';
     const room = Math.max(0, w - visibleLen(s) - visibleLen(hint) - 1);
     if (room > 0) s += ' '.repeat(room) + DIM + hint + RESET;
     return s;
@@ -2257,12 +2259,25 @@ async function tuiLoop() {
     state.input = ''; state.cursor = 0;
     saveTabs(); render();
   }
-  function closeTab() {
+  function closeTab() { closeTabAt(state.active); }
+  function closeTabAt(i) {
     if (state.tabs.length <= 1) { flash('Son sekme kapatılamaz'); render(); return; }
-    state.tabs.splice(state.active, 1);
-    state.active = Math.min(state.active, state.tabs.length - 1);
-    loadCtx(cur());
+    if (i < 0 || i >= state.tabs.length) return;
+    const closingActive = (i === state.active);
+    state.tabs.splice(i, 1);
+    if (closingActive) {
+      state.active = Math.min(i, state.tabs.length - 1);
+      loadCtx(cur());
+    } else if (state.active > i) {
+      state.active--;
+    }
     saveTabs(); render();
+  }
+  function startRename() {
+    state.renaming = true;
+    state.input = ''; state.cursor = 0;
+    flash('Sekme adı yaz, Enter onayla (Esc vazgeç)');
+    render();
   }
   function moveTab(d) {
     if (state.tabs.length <= 1) return;
@@ -2477,7 +2492,7 @@ async function tuiLoop() {
     const bw = Math.min(w - 8, 64);
     const bx = Math.max(0, Math.floor((w - bw) / 2));
     const fw = Math.max(10, bw - 5); // yazi alani ('│ › ' sonrasi)
-    const title = '✦ Pollux';
+    const title = state.renaming ? '✦ Sekme adı' : '✦ Pollux';
     frame.push(' '.repeat(bx) + GOLD + '╭─ ' + RESET + BRIGHT + title + RESET + GOLD + ' ' + '─'.repeat(Math.max(0, bw - 13)) + '╮' + RESET);
     const hintText = 'Ask anything... "Van kedisi nedir"';
     const hint = hintText.length > bw - 3 ? hintText.slice(0, bw - 3) : hintText;
@@ -2525,11 +2540,25 @@ async function tuiLoop() {
     const tab = cur();
     state.input = ''; state.cursor = 0; tab.offset = 0;
     if (!t) { render(); return; }
+    if (state.renaming) {
+      state.renaming = false;
+      if (!t.startsWith('/') && t.length <= 24) {
+        tab.name = t;
+        flash('Sekme adı: ' + t);
+      }
+      saveTabs(); render(); return;
+    }
     if (t === '/cikis' || t === '/exit' || t === 'cikis' || t === 'exit' || t === 'quit') {
       saveCtx(tab); saveTabs(); cleanup(); process.exit(0); return;
     }
     if (t === '/link' || t === 'linklerim' || t === 'linkler') {
       push(t, 'u'); openUrl(LINKS_URL); flash('Bağlantıların açılıyor...');
+      saveTabs(); render(); return;
+    }
+    if (t === '/ad' || t.startsWith('/ad ')) {
+      const nm = t.slice(3).trim().slice(0, 24);
+      if (nm) { tab.name = nm; flash('Sekme adı: ' + nm); }
+      else flash('Kullanım: /ad Yeni İsim (veya F2)');
       saveTabs(); render(); return;
     }
     if (/^[0-9]+$/.test(t) && tab.pendingUrls.length) {
@@ -2619,10 +2648,14 @@ async function tuiLoop() {
     }
   }
   function onMouseClick(x, y) {
-    // Sekmeler (1. satir)
+    // Sekmeler (1. satir): govdeye tikla gec, × isaretine tikla kapat
     if (y === 1 && state.tabRegions) {
       for (const r of state.tabRegions) {
-        if (x - 1 >= r.x0 && x - 1 < r.x1) { switchToTab(r.i); return true; }
+        if (x - 1 >= r.x0 && x - 1 < r.x1) {
+          if (r.close) closeTabAt(r.i);
+          else switchToTab(r.i);
+          return true;
+        }
       }
       return false;
     }
@@ -2673,8 +2706,9 @@ async function tuiLoop() {
   const decoder = new (require('string_decoder').StringDecoder)('utf8');
   stdin.on('data', async (chunk) => {
     const str = decoder.write(chunk);
-    // F1 / F2: baglantilari acar (fare calismazsa garanti yol)
-    if (str === '\x1bOP' || str === '\x1bOQ') { openLinks(); return; }
+    // F1: baglantilari acar, F2: sekmeyi yeniden adlandir
+    if (str === '\x1bOP') { openLinks(); return; }
+    if (str === '\x1bOQ') { startRename(); return; }
     // Ctrl+T yeni sekme, Ctrl+W kapat
     if (str.includes('\x14')) { openTab(); return; }
     if (str.includes('\x17')) { closeTab(); return; }
@@ -2722,7 +2756,11 @@ async function tuiLoop() {
       return; // diger ozel tuslari yoksay
     }
     for (const ch of str) {
-      if (ch === '\x03' || ch === '\x1b') { cleanup(); process.exit(0); return; } // Ctrl+C / Esc
+      if (ch === '\x03') { cleanup(); process.exit(0); return; } // Ctrl+C
+      else if (ch === '\x1b') {
+        if (state.renaming) { state.renaming = false; state.input = ''; state.cursor = 0; render(); return; }
+        cleanup(); process.exit(0); return; // Esc
+      }
       else if (ch === '\r' || ch === '\n') {
         if (!state.busy) await submit();
         else render();

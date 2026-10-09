@@ -2322,65 +2322,22 @@ async function tuiLoop() {
     return out;
   }
 
-  // Terminalin bildirdigi gercek gorunur alan.
-  // Windows Terminal: stdout degerleri dogru (kanitlanmis).
-  // Klasik conhost: stdout tampon boyunu verebilir -> konsol pencere boyutu.
-  // Digerleri: DSR/CPR sorgusu, en sonda stdout degeri.
-  function queryTermSize() {
-    return new Promise((resolve) => {
-      const fromStdout = () => {
-        if (process.stdout.columns > 0) TERM.w = process.stdout.columns;
-        if (process.stdout.rows > 0) TERM.h = process.stdout.rows;
-      };
-      if (process.env.WT_SESSION) {
-        fromStdout();
-        resolve();
-        return;
-      }
-      if (process.platform === 'win32' && stdout.isTTY) {
-        try {
-          const cp = require('child_process');
-          cp.execFile(
-            'powershell.exe',
-            ['-noprofile', '-command', '(Get-Host).UI.RawUI.WindowSize.Width; (Get-Host).UI.RawUI.WindowSize.Height'],
-            { timeout: 3000, windowsHide: true },
-            (err, so) => {
-              if (!err) {
-                const parts = String(so || '').trim().split(/\s+/).map((x) => parseInt(x, 10));
-                if (parts.length >= 2 && parts[0] > 0 && parts[1] > 0) {
-                  TERM.w = parts[0]; TERM.h = parts[1];
-                  resolve();
-                  return;
-                }
-              }
-              fromStdout();
-              resolve();
-            }
-          );
-          return;
-        } catch (e) {}
-      }
-      dsrFallback((ok) => { if (!ok) fromStdout(); resolve(); });
-    });
-  }
-  function dsrFallback(done) {
-    let finished = false;
-    const finish = (w, h, ok) => {
-      if (finished) return;
-      finished = true;
-      try { stdin.removeListener('data', onData); } catch (e) {}
-      if (ok && w > 0 && h > 0) { TERM.w = w; TERM.h = h; }
-      done(ok);
-    };
-    const onData = (chunk) => {
-      let s = '';
-      try { s = chunk.toString('utf8'); } catch (e) {}
-      const m = s.match(/\x1b\[(\d+);(\d+)R/);
-      if (m) finish(parseInt(m[2], 10), parseInt(m[1], 10), true);
-    };
-    stdin.on('data', onData);
-    try { stdout.write('\x1b[999;999H\x1b[6n'); } catch (e) {}
-    setTimeout(() => finish(0, 0, false), 400);
+  // Terminal boyutu: stdout pencere boyutunu verir. Pencere sonradan
+  // degisirse (buyutme/font) diye 2 sn'de bir tazele, degistiysde bastan ciz.
+  let sizeTimer = null;
+  function watchTermSize() {
+    if (sizeTimer) return;
+    sizeTimer = setInterval(() => {
+      try {
+        const w = process.stdout.columns || 0, h = process.stdout.rows || 0;
+        if (w >= 40 && h >= 20 && (w !== TERM.w || h !== TERM.h)) {
+          TERM.w = w; TERM.h = h;
+          needClear = true;
+          try { render(); } catch (e) {}
+        }
+      } catch (e) {}
+    }, 2000);
+    try { sizeTimer.unref(); } catch (e) {}
   }
 
   // Acilis animasyonu: donen imlec + ilerleme cubugu (bilgi bankasi yuklenirken)
@@ -2558,6 +2515,7 @@ async function tuiLoop() {
     stdout.write('\x1b[' + crow + ';' + ccol + 'H\x1b[?25h');
   }
   function cleanup() {
+    try { if (sizeTimer) clearInterval(sizeTimer); } catch (e) {}
     try { stdout.write('\x1b[?1000l\x1b[?1006l\x1b[?25h' + RESET + '\n'); } catch (e) {}
     try { stdin.setRawMode(false); } catch (e) {}
     try { stdin.removeAllListeners('data'); } catch (e) {}
@@ -2696,9 +2654,12 @@ async function tuiLoop() {
 
   stdin.setRawMode(true);
   stdin.resume();
-  // Gercek pencere boyutu: conhost rows degerini tampon boyundan verebilir,
-  // imleci en saga-asagiya atip terminalin raporunu oku (DSR/CPR)
-  try { await queryTermSize(); } catch (e) {}
+  // Boyut: stdout degeri + pencere degisimlerini izle
+  try {
+    if (process.stdout.columns > 0) TERM.w = process.stdout.columns;
+    if (process.stdout.rows > 0) TERM.h = process.stdout.rows;
+  } catch (e) {}
+  watchTermSize();
   stdout.write('\x1b[?1000h\x1b[?1006h');
   loadTabs();
   loadCtx(cur());
@@ -2707,11 +2668,7 @@ async function tuiLoop() {
     flash('Fare çalışmazsa: Windows Terminal kullan • F1 ve sayı tuşları her zaman çalışır');
   }
   render();
-  process.on('SIGWINCH', async () => {
-    needClear = true;
-    try { await queryTermSize(); } catch (e) {}
-    render();
-  });
+  process.on('SIGWINCH', () => { needClear = true; render(); });
   let mouseBuf = '';
   const decoder = new (require('string_decoder').StringDecoder)('utf8');
   stdin.on('data', async (chunk) => {

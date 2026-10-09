@@ -2337,8 +2337,64 @@ async function tuiLoop() {
     return out;
   }
 
-  // Terminal boyutu: stdout pencere boyutunu verir. Pencere sonradan
-  // degisirse (buyutme/font) diye 2 sn'de bir tazele, degistiysde bastan ciz.
+  // Terminal boyutu: acilista yetkili kaynaktan (conhost: konsol penceresi,
+  // WT: stdout), pencere sonradan degisirse 2 sn'lik izleyici yakalar.
+  function queryTermSize() {
+    return new Promise((resolve) => {
+      const fromStdout = () => {
+        if (process.stdout.columns > 0) TERM.w = process.stdout.columns;
+        if (process.stdout.rows > 0) TERM.h = process.stdout.rows;
+      };
+      if (process.env.WT_SESSION) {
+        fromStdout();
+        resolve();
+        return;
+      }
+      if (process.platform === 'win32' && stdout.isTTY) {
+        try {
+          const cp = require('child_process');
+          cp.execFile(
+            'powershell.exe',
+            ['-noprofile', '-command', '(Get-Host).UI.RawUI.WindowSize.Width; (Get-Host).UI.RawUI.WindowSize.Height'],
+            { timeout: 3000, windowsHide: true },
+            (err, so) => {
+              if (!err) {
+                const parts = String(so || '').trim().split(/\s+/).map((x) => parseInt(x, 10));
+                if (parts.length >= 2 && parts[0] > 0 && parts[1] > 0) {
+                  TERM.w = parts[0]; TERM.h = parts[1];
+                  resolve();
+                  return;
+                }
+              }
+              fromStdout();
+              resolve();
+            }
+          );
+          return;
+        } catch (e) {}
+      }
+      dsrFallback((ok) => { if (!ok) fromStdout(); resolve(); });
+    });
+  }
+  function dsrFallback(done) {
+    let finished = false;
+    const finish = (w, h, ok) => {
+      if (finished) return;
+      finished = true;
+      try { stdin.removeListener('data', onData); } catch (e) {}
+      if (ok && w > 0 && h > 0) { TERM.w = w; TERM.h = h; }
+      done(ok);
+    };
+    const onData = (chunk) => {
+      let s = '';
+      try { s = chunk.toString('utf8'); } catch (e) {}
+      const m = s.match(/\x1b\[(\d+);(\d+)R/);
+      if (m) finish(parseInt(m[2], 10), parseInt(m[1], 10), true);
+    };
+    stdin.on('data', onData);
+    try { stdout.write('\x1b[999;999H\x1b[6n'); } catch (e) {}
+    setTimeout(() => finish(0, 0, false), 400);
+  }
   let sizeTimer = null;
   function watchTermSize() {
     if (sizeTimer) return;
@@ -2346,9 +2402,13 @@ async function tuiLoop() {
       try {
         const w = process.stdout.columns || 0, h = process.stdout.rows || 0;
         if (w >= 40 && h >= 20 && (w !== TERM.w || h !== TERM.h)) {
-          TERM.w = w; TERM.h = h;
-          needClear = true;
-          try { render(); } catch (e) {}
+          if (!process.env.WT_SESSION && process.platform === 'win32' && stdout.isTTY) {
+            queryTermSize().then(() => { needClear = true; try { render(); } catch (e) {} });
+          } else {
+            TERM.w = w; TERM.h = h;
+            needClear = true;
+            try { render(); } catch (e) {}
+          }
         }
       } catch (e) {}
     }, 2000);
@@ -2687,11 +2747,8 @@ async function tuiLoop() {
 
   stdin.setRawMode(true);
   stdin.resume();
-  // Boyut: stdout degeri + pencere degisimlerini izle
-  try {
-    if (process.stdout.columns > 0) TERM.w = process.stdout.columns;
-    if (process.stdout.rows > 0) TERM.h = process.stdout.rows;
-  } catch (e) {}
+  // Boyut: yetkili kaynaktan olc + pencere degisimlerini izle
+  try { await queryTermSize(); } catch (e) {}
   watchTermSize();
   stdout.write('\x1b[?1000h\x1b[?1006h');
   loadTabs();
@@ -2784,6 +2841,11 @@ async function tuiLoop() {
 // ---------- giris ----------
 async function main() {
   const rawArgs = process.argv.slice(2);
+  if (rawArgs.includes('--version') || rawArgs.includes('-v')) {
+    try { console.log(require('./package.json').version); }
+    catch (e) { console.log('bilinmiyor'); }
+    return;
+  }
   const autoOpen = rawArgs.includes('--ac');
   const wantChat = rawArgs.includes('--chat');
   const args = rawArgs.filter((a) => a !== '--ac' && a !== '--tui' && a !== '--chat');

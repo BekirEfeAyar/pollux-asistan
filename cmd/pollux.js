@@ -14,10 +14,103 @@ function readJson(name, fallback) {
     return JSON.parse(fs.readFileSync(path.join(DIR, name), 'utf8').replace(/^\uFEFF/, ''));
   } catch (e) { return fallback; }
 }
-const KNOWLEDGE = readJson('knowledge.json', { entries: [] }).entries;
+let KNOWLEDGE = [];
+let KNOWLEDGE_READY = false;
+let KNOWLEDGE_WARNED = false;
 const DICT = readJson('dict.json', { pairs: [] }).pairs;
-if (!KNOWLEDGE.length) console.error('UYARI: bilgi bankasi bos yuklendi!');
 if (!DICT.length) console.error('UYARI: sozluk bos yuklendi!');
+function knowledgePath() { return path.join(DIR, 'knowledge.json'); }
+// Tembel yukleme: kucuk dosya dogrudan, buyuk dosya (V8 string limitini
+// asar) parca parca okunur; olay dongusu nefes alir, ilerleme bildirilir.
+function ensureKnowledge(onProgress) {
+  if (KNOWLEDGE_READY) {
+    if (onProgress) { try { onProgress(1, 1); } catch (e) {} }
+    return Promise.resolve(KNOWLEDGE);
+  }
+  return new Promise((resolve) => {
+    let size = 0;
+    try { size = fs.statSync(knowledgePath()).size; } catch (e) {}
+    if (size > 0 && size < 50 * 1024 * 1024) {
+      try { KNOWLEDGE = readJson('knowledge.json', { entries: [] }).entries; } catch (e) { KNOWLEDGE = []; }
+      KNOWLEDGE_READY = true;
+      if (!KNOWLEDGE.length && !KNOWLEDGE_WARNED) { KNOWLEDGE_WARNED = true; console.error('UYARI: bilgi bankasi bos yuklendi!'); }
+      if (onProgress) { try { onProgress(1, 1); } catch (e) {} }
+      resolve(KNOWLEDGE);
+      return;
+    }
+    const list = [];
+    const rs = fs.createReadStream(knowledgePath(), { encoding: 'utf8', highWaterMark: 4 * 1024 * 1024 });
+    let buf = '', started = false, depth = 0, objStart = -1, bytes = 0, failed = false;
+    const parseBuf = () => {
+      let i = 0;
+      while (i < buf.length) {
+        if (!started) {
+          const idx = buf.indexOf('{"k":', i);
+          if (idx < 0) { buf = ''; return; }
+          buf = buf.slice(idx);
+          started = true;
+          i = 0;
+        }
+        const c = buf[i];
+        if (c === '{') { if (depth === 0) objStart = i; depth++; }
+        else if (c === '}') {
+          depth--;
+          if (depth === 0 && objStart >= 0) {
+            const objStr = buf.slice(objStart, i + 1);
+            try {
+              const e = JSON.parse(objStr);
+              if (e.k && e.k.length && e.a) list.push(e);
+            } catch (e) {}
+            buf = buf.slice(i + 1);
+            i = -1;
+            objStart = -1;
+          }
+        }
+        i++;
+      }
+      if (depth > 0 && objStart >= 0) { buf = buf.slice(objStart); depth = 0; objStart = 0; }
+      else if (depth === 0) { buf = ''; }
+    };
+    rs.on('data', (chunk) => {
+      rs.pause();
+      buf += chunk;
+      bytes += chunk.length;
+      try { parseBuf(); } catch (e) {}
+      if (onProgress && size > 0) { try { onProgress(bytes, size); } catch (e) {} }
+      setImmediate(() => rs.resume());
+    });
+    rs.on('end', () => {
+      try { parseBuf(); } catch (e) {}
+      KNOWLEDGE = list;
+      KNOWLEDGE_READY = true;
+      if (!KNOWLEDGE.length && !KNOWLEDGE_WARNED) { KNOWLEDGE_WARNED = true; console.error('UYARI: bilgi bankasi bos yuklendi!'); }
+      if (onProgress) { try { onProgress(size || 1, size || 1); } catch (e) {} }
+      resolve(KNOWLEDGE);
+    });
+    rs.on('error', () => {
+      if (!failed) {
+        failed = true;
+        try { KNOWLEDGE = readJson('knowledge.json', { entries: [] }).entries; } catch (e) { KNOWLEDGE = []; }
+        KNOWLEDGE_READY = true;
+        resolve(KNOWLEDGE);
+      }
+    });
+  });
+}
+// Konsol kipleri icin tek satirlik yukleme gostergesi (TTY ise)
+function cliProgress() {
+  if (!process.stderr.isTTY) return null;
+  let last = -1;
+  return (d, t) => {
+    if (!(t > 1)) return;
+    const p = Math.min(100, Math.round((d / t) * 100));
+    if (p !== last) {
+      last = p;
+      process.stderr.write('\rBilgi bankası yükleniyor... %' + p);
+      if (d >= t) process.stderr.write('\n');
+    }
+  };
+}
 
 // Tam veri seti (10M kayit) indirilebilir
 const DATA_URL = 'https://github.com/BekirEfeAyar/pollux-asistan/releases/download/v2.0.23-data/knowledge.json.gz';
@@ -1931,6 +2024,38 @@ async function tuiLoop() {
     return out;
   }
 
+  // Acilis animasyonu: donen imlec + ilerleme cubugu (bilgi bankasi yuklenirken)
+  async function splashLoad() {
+    const SPIN = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+    let si = 0, done = 0, total = 1, finished = false;
+    const draw = () => {
+      const { w, h } = tuiSize();
+      const logo = logoLines();
+      const logoW = Math.max(...logo.map(visibleLen));
+      const lx = Math.max(0, Math.floor((w - logoW) / 2));
+      const lines = [];
+      for (const row of logo) lines.push(' '.repeat(lx) + row);
+      lines.push('');
+      const pct = total > 0 ? Math.min(1, done / total) : 0;
+      const msg = finished ? 'Hazır!' : 'Pollux açılıyor...';
+      const cx = Math.max(0, Math.floor((w - 24) / 2));
+      lines.push(' '.repeat(cx) + GOLD + SPIN[si % SPIN.length] + RESET + '  ' + AGRAY + msg + RESET);
+      const bw2 = Math.min(34, w - 10);
+      const fill = Math.round(pct * bw2);
+      const bx2 = Math.max(0, Math.floor((w - (bw2 + 6)) / 2));
+      lines.push(' '.repeat(bx2) + DIM + '[' + RESET + GREEN + '━'.repeat(fill) + RESET + DIM + '─'.repeat(Math.max(0, bw2 - fill)) + RESET + DIM + ']' + RESET + ' ' + AGRAY + Math.round(pct * 100) + '%' + RESET);
+      const pad = Math.max(0, Math.floor((h - lines.length) / 2));
+      stdout.write('\x1b[H\x1b[2J\x1b[?25l' + '\n'.repeat(pad) + lines.join('\n'));
+    };
+    draw();
+    const timer = setInterval(() => { si++; draw(); }, 90);
+    await ensureKnowledge((d, t) => { done = d; total = t || 1; });
+    finished = true;
+    draw();
+    clearInterval(timer);
+    needClear = true;
+  }
+
   function push(text, who, topics) {
     // Ham paragraf sakla; sarma + renklendirme render'da (pencere boyuna uyar)
     for (const para of String(text).split('\n')) {
@@ -2159,6 +2284,7 @@ async function tuiLoop() {
   stdin.setRawMode(true);
   stdin.resume();
   stdout.write('\x1b[?1000h\x1b[?1006h');
+  await splashLoad();
   render();
   process.on('SIGWINCH', () => { needClear = true; render(); });
   let mouseBuf = '';
@@ -2232,6 +2358,7 @@ async function main() {
     await tuiLoop(); return;
   }
   if (args.length) {
+    await ensureKnowledge(cliProgress());
     const out = await answer(args.join(' '));
     await streamWords(out, 18, (chunk) => process.stdout.write(chunk));
     process.stdout.write('\n');
@@ -2248,6 +2375,7 @@ async function main() {
     return;
   }
   console.log('Pollux, senin asistanın. (çıkış: /cikis)');
+  await ensureKnowledge(cliProgress());
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const ask = () => rl.question('sen> ', async (line) => {
     const t = line.trim();

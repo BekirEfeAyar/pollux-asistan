@@ -2323,11 +2323,20 @@ async function tuiLoop() {
   }
 
   // Terminalin bildirdigi gercek gorunur alan.
-  // Windows'ta konsol pencere boyutu (conhost tampon boyunu verebilir);
-  // digerlerinde DSR/CPR sorgusu, en sonda stdout degeri.
+  // Windows Terminal: stdout degerleri dogru (kanitlanmis).
+  // Klasik conhost: stdout tampon boyunu verebilir -> konsol pencere boyutu.
+  // Digerleri: DSR/CPR sorgusu, en sonda stdout degeri.
   function queryTermSize() {
     return new Promise((resolve) => {
-      // Konsol yoksa (boru/harness) stdout degerlerine dokunma
+      const fromStdout = () => {
+        if (process.stdout.columns > 0) TERM.w = process.stdout.columns;
+        if (process.stdout.rows > 0) TERM.h = process.stdout.rows;
+      };
+      if (process.env.WT_SESSION) {
+        fromStdout();
+        resolve();
+        return;
+      }
       if (process.platform === 'win32' && stdout.isTTY) {
         try {
           const cp = require('child_process');
@@ -2344,33 +2353,34 @@ async function tuiLoop() {
                   return;
                 }
               }
-              dsrFallback(resolve);
+              fromStdout();
+              resolve();
             }
           );
           return;
         } catch (e) {}
       }
-      dsrFallback(resolve);
+      dsrFallback((ok) => { if (!ok) fromStdout(); resolve(); });
     });
   }
-  function dsrFallback(resolve) {
-    let done = false;
-    const finish = (w, h) => {
-      if (done) return;
-      done = true;
+  function dsrFallback(done) {
+    let finished = false;
+    const finish = (w, h, ok) => {
+      if (finished) return;
+      finished = true;
       try { stdin.removeListener('data', onData); } catch (e) {}
-      if (w > 0 && h > 0) { TERM.w = w; TERM.h = h; }
-      resolve();
+      if (ok && w > 0 && h > 0) { TERM.w = w; TERM.h = h; }
+      done(ok);
     };
     const onData = (chunk) => {
       let s = '';
       try { s = chunk.toString('utf8'); } catch (e) {}
       const m = s.match(/\x1b\[(\d+);(\d+)R/);
-      if (m) finish(parseInt(m[2], 10), parseInt(m[1], 10));
+      if (m) finish(parseInt(m[2], 10), parseInt(m[1], 10), true);
     };
     stdin.on('data', onData);
     try { stdout.write('\x1b[999;999H\x1b[6n'); } catch (e) {}
-    setTimeout(() => finish(0, 0), 400);
+    setTimeout(() => finish(0, 0, false), 400);
   }
 
   // Acilis animasyonu: donen imlec + ilerleme cubugu (bilgi bankasi yuklenirken)

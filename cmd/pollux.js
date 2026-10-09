@@ -1906,7 +1906,7 @@ async function tuiLoop() {
     input: '', cursor: 0, lines: [], offset: 0,
     status: "My Links'e tıkla / F1 / /link • PgUp/PgDn: kaydır • çıkış: /cikis",
     statusUntil: 0, busy: false, pendingUrls: [],
-    linkRow: 0, linkCol: 0,
+    linkRow: 0, linkCol: 0, dots: 0,
   };
   const DIM = '\x1b[2m', BRIGHT = '\x1b[1m', RESET = '\x1b[0m';
   const AGRAY = '\x1b[38;5;250m', GREEN = '\x1b[92m', MRED = '\x1b[31m';
@@ -1961,26 +1961,17 @@ async function tuiLoop() {
     state.status = msg;
     state.statusUntil = Date.now() + 2500;
   }
+  let needClear = true; // ilk kare + pencere boyutu degisince tam temizle
   function visibleLen(s) { return s.replace(/\x1b\[[0-9;]*m/g, '').length; }
   function render() {
     const { w, h } = tuiSize();
     const logo = logoLines();
     const logoW = Math.max(...logo.map(visibleLen));
-    const topPad = 2;
-    let s = '\x1b[H\x1b[2J\x1b[?25l' + '\n'.repeat(topPad);
-    // Logo (ortali, nokta-matris + golge) — biraz asagida
-    for (const row of logo) {
-      s += ' '.repeat(Math.max(0, Math.floor((w - logoW) / 2))) + row + '\n';
-    }
-    // Sohbet: logonun altinda, biraz asagidan baslar.
-    // Kullanici ortali; asistan ortalanmis sutunda sola dayali, paragraflar aralikli,
-    // konu kelimeleri yesil.
-    const boxTop = h - 3;
-    const gap = 2;
+    const logoX = Math.max(0, Math.floor((w - logoW) / 2));
     const colW = Math.min(w - 8, 92);
     const colX = Math.max(0, Math.floor((w - colW) / 2));
-    const histRows = Math.max(0, boxTop - (topPad + logo.length + gap));
-    // Gorunen satir sayisini once hesapla (paragraf bosluklari dahil)
+    const histRows = Math.max(1, h - 15);
+    // Gorunen satirlar (paragraf bosluklari dahil)
     function expanded() {
       const rows = [];
       for (const m of state.lines) {
@@ -1996,54 +1987,71 @@ async function tuiLoop() {
     state.offset = off;
     const tail = off === 0 ? rows.slice(-histRows)
       : rows.slice(Math.max(0, rows.length - histRows - off), rows.length - off);
-    for (let i = 0; i < gap; i++) s += '\n';
+    const frame = [];
+    for (const row of logo) frame.push(' '.repeat(logoX) + row);
+    frame.push('');
     for (const ln of tail) {
-      if (ln.gap) { s += '\n'; continue; }
+      if (ln.gap) { frame.push(''); continue; }
       if (ln.who === 'u') {
-        s += ' '.repeat(Math.max(0, Math.floor((w - visibleLen(ln.t)) / 2))) + BRIGHT + ln.t + RESET + '\n';
+        frame.push(' '.repeat(Math.max(0, Math.floor((w - visibleLen(ln.t)) / 2))) + BRIGHT + ln.t + RESET);
       } else {
         let t = ln.t;
+        let bar = GREEN;
+        if (t.startsWith('[!]')) bar = MRED;
         if (t.startsWith('Bağlantı:')) {
           // Etiket gri, adres boguk kirmizi
           t = 'Bağlantı: ' + MRED + t.slice('Bağlantı:'.length).trim() + AGRAY;
         } else {
           if (!t.startsWith('[!]')) t = greenTopics(t, ln.topics);
           // Kaynak + yapay zeka etiketi boguk kirmizi (civitmaz)
-          t = t.replace(/\(Kaynak: [^)]+\)/g, (m) => MRED + m + AGRAY)
-               .replace(/\(Yapay zeka yanıtı\)/g, (m) => MRED + m + AGRAY);
+          t = t.replace(/\(Kaynak: [^)]+\)/g, (mm) => MRED + mm + AGRAY)
+               .replace(/\(Yapay zeka yanıtı\)/g, (mm) => MRED + mm + AGRAY);
         }
-        s += ' '.repeat(colX) + AGRAY + t + RESET + '\n';
+        frame.push(' '.repeat(colX) + bar + '│ ' + RESET + AGRAY + t + RESET);
       }
     }
-    const used = topPad + logo.length + gap + tail.length;
-    for (let i = used; i < boxTop; i++) s += '\n';
-    // Giris kutusu: 1. satir ipucu, 2. satir yazilan (fotograf gibi)
+    while (frame.length < h - 6) frame.push('');
+    // Ayrac cizgisi
+    frame.push(DIM + '─'.repeat(Math.max(0, w)) + RESET);
+    // Giris kutusu (yuvarlak, altin cerceve)
     const bw = Math.min(w - 8, 64);
     const bx = Math.max(0, Math.floor((w - bw) / 2));
-    const iw = bw - 4;
+    const fw = Math.max(10, bw - 5); // yazi alani ('│ › ' sonrasi)
+    const title = '✦ Pollux';
+    frame.push(' '.repeat(bx) + GOLD + '╭─ ' + RESET + BRIGHT + title + RESET + GOLD + ' ' + '─'.repeat(Math.max(0, bw - 13)) + '╮' + RESET);
     const hintText = 'Ask anything... "Van kedisi nedir"';
-    let shown = state.input;
-    if (visibleLen(shown) > iw) shown = shown.slice(shown.length - iw);
-    s += ' '.repeat(bx) + BOXBG + GOLD + '▍' + RESET + BOXBG + ' ' + DIM + hintText;
-    s += ' '.repeat(Math.max(0, bw - 3 - visibleLen(hintText))) + ' ' + RESET + '\n';
-    s += ' '.repeat(bx) + BOXBG + GOLD + '▍' + RESET + BOXBG + ' ' + BRIGHT + shown;
-    s += ' '.repeat(Math.max(0, bw - 3 - visibleLen(shown))) + ' ' + RESET + '\n';
-    // Alt durum satiri: ~ solda (silil), My Links sagda (beyaz)
+    const hint = hintText.length > bw - 3 ? hintText.slice(0, bw - 3) : hintText;
+    frame.push(' '.repeat(bx) + GOLD + '│' + RESET + ' ' + DIM + hint + RESET + ' '.repeat(Math.max(0, (bw - 2) - 1 - visibleLen(hint))) + GOLD + '│' + RESET);
+    const text = state.input;
+    const shown = text.length > fw ? text.slice(text.length - fw) : text;
+    const cursorInShown = Math.min(shown.length, Math.max(0, state.cursor - (text.length - shown.length)));
+    frame.push(' '.repeat(bx) + GOLD + '│' + RESET + ' ' + GOLD + '›' + RESET + ' ' + BRIGHT + shown + RESET + ' '.repeat(Math.max(0, fw - shown.length)) + GOLD + '│' + RESET);
+    frame.push(' '.repeat(bx) + GOLD + '╰' + '─'.repeat(Math.max(0, bw - 2)) + '╯' + RESET);
+    // Alt durum satiri: ~ solda, My Links sagda
     const link = 'My Links';
     state.linkRow = h;
     state.linkCol = w - 7;
+    if (state.busy) state.dots++;
     const status = (Date.now() < state.statusUntil || state.busy)
-      ? (state.busy ? 'düşünüyor...' : state.status) : '';
-    let bar = DIM + '~' + RESET;
+      ? (state.busy ? 'düşünüyor' + '.'.repeat(1 + (state.dots % 3)) : state.status) : '';
+    let bar2 = DIM + '~' + RESET;
     let barVis = 1;
-    if (status) {
-      bar += '  ' + DIM + status + RESET;
+    if (status && (1 + 2 + visibleLen(status)) <= Math.max(0, w - 9)) {
+      bar2 += '  ' + DIM + status + RESET;
       barVis = 1 + 2 + visibleLen(status);
     }
-    const maxBar = Math.max(0, state.linkCol - 2);
-    if (barVis > maxBar) { bar = DIM + '~' + RESET; barVis = 1; }
-    s += bar + ' '.repeat(Math.max(1, state.linkCol - barVis - 1)) + BRIGHT + link + RESET;
+    frame.push(bar2 + ' '.repeat(Math.max(1, w - barVis - 8)) + BRIGHT + link + RESET);
+    // Tek seferde yaz: basa don, temizlemeden uzerine (titreme yok)
+    const out = frame.slice(0, h).map((ln) => {
+      const v = visibleLen(ln);
+      return v < w ? ln + RESET + ' '.repeat(w - v) : ln;
+    });
+    let s = '\x1b[H\x1b[?25l' + (needClear ? '\x1b[2J' : '') + out.join('\n');
+    needClear = false;
     stdout.write(s);
+    // Donanim imleci giris kutusuna koy
+    const crow = h - 2, ccol = bx + 5 + cursorInShown;
+    stdout.write('\x1b[' + crow + ';' + ccol + 'H\x1b[?25h');
   }
   function cleanup() {
     try { stdout.write('\x1b[?1000l\x1b[?1006l\x1b[?25h' + RESET + '\n'); } catch (e) {}
@@ -2071,10 +2079,15 @@ async function tuiLoop() {
       render(); return;
     }
     push(t, 'u');
-    state.busy = true; state.pendingUrls = [];
+    state.busy = true; state.pendingUrls = []; state.dots = 0;
     render();
+    const spin = setInterval(() => {
+      if (!state.busy) { clearInterval(spin); return; }
+      render();
+    }, 400);
     try {
       const out = await answer(t);
+      clearInterval(spin);
       state.busy = false;
       const qw = cleanTopic(t).split(' ').filter((x) => x);
       const topics = qw.slice();
@@ -2086,12 +2099,14 @@ async function tuiLoop() {
       const full = paras.join('\n');
       const words = full.split(/(\s+)/);
       let wi = 0;
+      let lastR = 0;
       await new Promise((resolve) => {
         const step = () => {
           let chunk = '';
           for (let k = 0; k < 3 && wi < words.length; k++, wi++) chunk += words[wi];
           msg.para += chunk;
-          render();
+          const now = Date.now();
+          if (now - lastR > 70 || wi >= words.length) { lastR = now; render(); }
           if (wi >= words.length) resolve();
           else setTimeout(step, 35);
         };
@@ -2106,6 +2121,7 @@ async function tuiLoop() {
         push('[!] Açmak için numarayı yaz (' + rest.map((u, i) => (i + 1) + ') ' + u).join('  ') + ')', 'a');
       }
     } catch (e) {
+      clearInterval(spin);
       state.busy = false;
       push('Hata: ' + e.message, 'a');
     }
@@ -2144,7 +2160,7 @@ async function tuiLoop() {
   stdin.resume();
   stdout.write('\x1b[?1000h\x1b[?1006h');
   render();
-  process.on('SIGWINCH', render);
+  process.on('SIGWINCH', () => { needClear = true; render(); });
   let mouseBuf = '';
   const decoder = new (require('string_decoder').StringDecoder)('utf8');
   stdin.on('data', async (chunk) => {

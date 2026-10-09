@@ -29,6 +29,7 @@ class ChatBrain(
     private var lastTopic: String = ""
     private var lastTitle: String = ""
     private var lastContext: String = ""
+    private val memory = MemoryStore(appCtx)
 
     private fun knowledgeTokens(s: String): List<String> {
         return try {
@@ -71,6 +72,12 @@ class ChatBrain(
         val f = fold(cmd)
         val tokens = f.split(" ").map { it.trim() }.filter { it.isNotBlank() }
         val shortMsg = tokens.size <= 3
+        // Kalıcı hafıza: her mesajdan ipuçlarını yakala (ad, sevdikleri, olaylar)
+        try {
+            memory.remember(raw, f)
+        } catch (_: Exception) {}
+        val memName = try { memory.load().name } catch (_: Exception) { "" }
+        val hi = if (memName.isNotBlank()) " $memName" else ""
 
         // ---- Selamlaşma / küçük sohbet ----
         if (f.contains("iyi geceler") || f.contains("iyi uykular")) {
@@ -79,7 +86,7 @@ class ChatBrain(
         if (shortMsg && !tokens.contains("misin") && tokens.any { it in setOf("merhaba", "selam", "selamlar", "slm", "mrb", "hey", "gunaydin", "gunaydinlar", "iyi", "aksamlar", "günaydın") } ||
             f.contains("iyi aksam") || f.contains("iyi gunler") || f == "naber"
         ) {
-            return Answer("Merhaba! Sana nasıl yardımcı olabilirim?")
+            return Answer(if (memName.isNotBlank()) "Merhaba $memName! Sana nasıl yardımcı olabilirim?" else "Merhaba! Sana nasıl yardımcı olabilirim?")
         }
         if (f.contains("nasilsin") || f.contains("naslsin") || f.contains("nasil gidiyor") || f.contains("naber") || f.contains("ne haber")) {
             return Answer(
@@ -145,6 +152,54 @@ class ChatBrain(
                 ).random()
             )
         }
+        // Hafıza soruları + dert devamı: bilgi bankasından önce
+        if (lastTopic == "dert" && f.trim().length <= 40 && !f.contains("?")) {
+            val shorts = setOf(
+                "tamam", "tmm", "evet", "anladim", "anladım", "oyle", "öyle", "aynen",
+                "hayir", "hayır", "sag ol", "sağ ol", "tesekkurler", "teşekkürler",
+                "saol", "eyvallah", "peki", "hmm", "hı", "yok"
+            )
+            val t = f.trim()
+            if (shorts.any { t == it || t.startsWith("$it ") }) {
+                lastTopic = ""
+                return Answer(
+                    listOf(
+                        "Yanındayım. İstersen biraz daha anlat, dinliyorum.",
+                        "Anlıyorum. Kendine yüklenme fazla, zamanla düzelir. Buradayım.",
+                        "Haklısın, kolay değil. Nefes al, ben buradayım.$hi."
+                    ).random()
+                )
+            }
+        }
+        if (f.contains("adimi biliyor musun") || f.contains("adim ne") || f.contains("adimi hatirliyor musun") || f.contains("benim adim ne")) {
+            val n = try { memory.load().name } catch (_: Exception) { "" }
+            return Answer(
+                if (n.isNotBlank()) "Tabii$hi, adın $n. Unutmam."
+                else "Henüz adını söylemedin. Adın ne? Söyle, aklımda tutayım."
+            )
+        }
+        if (f.contains("beni taniyor musun") || f.contains("hakkimda ne biliyorsun") || f.contains("hakkımda ne biliyorsun") || f.contains("benim hakkimda")) {
+            val s = try { memory.summary() } catch (_: Exception) { "" }
+            return Answer(
+                s.ifBlank { "Daha yeniyiz, birbirimizi tanıyoruz. Adını söylersen aklımda tutarım, sevdiklerini anlatırsan unutmam." }
+            )
+        }
+        if (f.contains("ne demistim") || f.contains("ne demiştim") || f.contains("dun ne konustuk") || f.contains("dün ne konuştuk") || f.contains("hatirliyor musun") || f.contains("hatırlıyor musun")) {
+            val facts = try { memory.load().facts.take(3) } catch (_: Exception) { emptyList() }
+            val n = try { memory.load().name } catch (_: Exception) { "" }
+            return Answer(
+                when {
+                    facts.isNotEmpty() -> "Aklımda kalanlar: " + facts.joinToString("; ") + ". Başka bir şey de anlatabilirsin."
+                    n.isNotBlank() -> "$n, adını biliyorum ama başka bir notum yok. Anlat, aklımda tutayım."
+                    else -> "Henüz bana özel bir şey anlatmadın. Anlatırsan unutmam."
+                }
+            )
+        }
+        if (f.contains("adimi unut") || f.contains("adımı unut") || f.contains("beni unut") || f.contains("hafizani temizle") || f.contains("hafızanı temizle")) {
+            try { memory.clear() } catch (_: Exception) {}
+            lastTopic = ""
+            return Answer("Tamam, hakkındaki her şeyi unuttum. Tertemiz bir sayfa açtık.")
+        }
         // Can sıkıntısı / moral bozukluğu: sıcak destek + öneri
         if (f.contains("canim sikiliyor") || f.contains("sikildim") || f.contains("cok sikildim")) {
             return Answer(
@@ -156,13 +211,133 @@ class ChatBrain(
             )
         }
         if (f.contains("moralim bozuk") || f.contains("moralsizim") || f.contains("uzgunum") || f.contains("uzgnum") || f.contains("depresyondayim") || f.contains("yalnizim") || f.contains("yalniz hissediyorum")) {
+            lastTopic = "dert"
             return Answer(
-                listOf(
-                    "Üzüldüm. Ama şunu bil: ben hep buradayım, dinlerim. Anlatmak ister misin?",
-                    "Kötü hissetmek insani bir şey, geçecek. İstersen sana moral vereyim, ister misin?",
-                    "Yanındayım. Derin bir nefes al, sonra içini dök. Dinliyorum."
-                ).random()
+                Persona.pick(
+                    appCtx,
+                    listOf(
+                        Persona.V("Üzüldüm$hi. Ama şunu bil: ben hep buradayım, dinlerim. Anlatmak ister misin?"),
+                        Persona.V("Kıyamam sana. Kötü hissetmek insani bir şey, geçecek. İçini dök hadi, dinliyorum.", true)
+                    ),
+                    listOf(
+                        Persona.V("Üzüldüm. Ama şunu bil: ben hep buradayım, dinlerim. Anlatmak ister misin?"),
+                        Persona.V("Kötü hissetmek insani bir şey, geçecek. İstersen sana moral vereyim, ister misin?"),
+                        Persona.V("Yanındayım. Derin bir nefes al, sonra içini dök. Dinliyorum.")
+                    ),
+                    listOf(Persona.V("Üzüldüğünüzü duymak beni de üzdü. Anlatmak isterseniz dinliyorum."))
+                )
             )
+        }
+        // Ayrılık / iş / okul / kavga / uyku: derin dertleşme
+        if (f.contains("ayrildik") || f.contains("ayrıldık") || f.contains("sevgilimden ayrildim") || f.contains("terk edildim") || f.contains("aldatildim") || f.contains("aldatıldım")) {
+            lastTopic = "dert"
+            return Answer(
+                Persona.pick(
+                    appCtx,
+                    listOf(
+                        Persona.V("Çok zor bir şey bu$hi, kıyamam. Zaman her şeyin ilacı derler, gerçekten öyle. Anlatmak ister misin, dinliyorum?", true),
+                        Persona.V("Ah be... Kalp kırıklığı kolay geçmiyor biliyorum. Ama atlatacaksın, inan bana. İçini dök hadi.")
+                    ),
+                    listOf(
+                        Persona.V("Ayrılık acısı zordur, bunu yaşaman normal. Zamanla hafifleyecek. Anlatmak istersen dinliyorum."),
+                        Persona.V("Üzüldüm. Kendine zaman tanı, acele etme. Buradayım, anlatabilirsin.")
+                    ),
+                    listOf(Persona.V("Üzüntünüzü paylaşıyorum. Zamanla düzelecektir, anlatmak isterseniz dinliyorum."))
+                )
+            )
+        }
+        if (f.contains("isten kovuldum") || f.contains("isten ayrildim") || f.contains("issizim") || f.contains("is bulamiyorum") || f.contains("patronum")) {
+            lastTopic = "dert"
+            return Answer(
+                Persona.pick(
+                    appCtx,
+                    listOf(
+                        Persona.V("İş konusu can sıkıcı$hi, haklısın. Ama bu bir son değil, yeni bir kapı. Durumu anlat, birlikte bakalım?", true),
+                        Persona.V("Zor dönemden geçiyorsun belli. Pes etmek yok, daha iyisi seni bekliyor. Anlat hadi.")
+                    ),
+                    listOf(
+                        Persona.V("İş hayatında böyle dönemler olur, geçici. Neler yaşadığını anlatırsan birlikte düşünelim."),
+                        Persona.V("Anlıyorum, streslisin. Adım adım çözelim, önce anlat bakalım ne oldu?")
+                    ),
+                    listOf(Persona.V("Durumu anlıyorum. Detay verirseniz yardımcı olmaya çalışırım."))
+                )
+            )
+        }
+        if ((f.contains("sinav") && (f.contains("stres") || f.contains("korkuyorum") || f.contains("calisamiyorum") || f.contains("calışamıyorum") || f.contains("var") || f.contains("kazanamam"))) || f.contains("ders calisamiyorum") || f.contains("ders çalışamıyorum")) {
+            lastTopic = "dert"
+            return Answer(
+                Persona.pick(
+                    appCtx,
+                    listOf(
+                        Persona.V("Sınav stresi herkeste olur$hi, yalnız değilsin. Küçük parçalara böl, tek tek hallet. Hangi ders sıkıştırıyor, anlat?", true),
+                        Persona.V("Panik yapma, nefes al. Planlı çalışınca hepsi hallolur. Nerede takıldın söyle bakalım.")
+                    ),
+                    listOf(
+                        Persona.V("Sınav kaygısı normaldir. Konuları parçalara bölüp program yapalım mı? Hangi ders zorluyor?"),
+                        Persona.V("Stres yapma, adım adım ilerleyelim. Önce durumunu anlat, plan kuralım.")
+                    ),
+                    listOf(Persona.V("Sınav stresi için düzenli program öneririm. Hangi konuda yardımcı olayım?"))
+                )
+            )
+        }
+        if (f.contains("kavga ettik") || f.contains("kavga ettim") || f.contains("tartistik") || f.contains("tartıştık") || f.contains("kus kaldik") || f.contains("küs kaldık") || f.contains("kustuk")) {
+            lastTopic = "dert"
+            return Answer(
+                Persona.pick(
+                    appCtx,
+                    listOf(
+                        Persona.V("Kavga sonrası iç sıkıntısı normal$hi. Kimle, ne oldu anlat; belki barışmanın yolunu buluruz?", true),
+                        Persona.V("Ah, tatsız olmuş. Biraz sakinleş, sonra konuşmak daha kolay olur. Anlat hadi, dinliyorum.")
+                    ),
+                    listOf(
+                        Persona.V("Kavga etmek insanidir, önemli olan sonrası. Anlatmak istersen dinliyorum, birlikte düşünelim."),
+                        Persona.V("Üzüldüm. Olayı anlatırsan nasıl düzeltebileceğine bakalım.")
+                    ),
+                    listOf(Persona.V("Yaşanan tatsızlık için üzgünüm. Anlatırsanız yardımcı olmaya çalışırım."))
+                )
+            )
+        }
+        if (f.contains("uyuyamiyorum") || f.contains("uyuyamıyorum") || f.contains("uykusuzum") || f.contains("uyku tutmuyor") || f.contains("uyku tutmuyo")) {
+            lastTopic = "dert"
+            return Answer(
+                Persona.pick(
+                    appCtx,
+                    listOf(
+                        Persona.V("Uyku kaçtı demek$hi. Telefonu bırak, ılık bir şey iç, derin nefes al. Ben buradayım, muhabbet edelim mi?", true),
+                        Persona.V("Gece uykusuzluğu zordur. Aklındakileri anlat, belki rahatlarsın. Dinliyorum.")
+                    ),
+                    listOf(
+                        Persona.V("Uykusuzluk zorlar. Ekranı kapatıp rahatlamayı dene, aklındakileri anlatırsan dinlerim."),
+                        Persona.V("Gece boyu düşünmek yorar. İçini dök, sonra uyumayı dene. Buradayım.")
+                    ),
+                    listOf(Persona.V("Uykusuzluk için ekranı kapatıp dinlenmeyi öneririm. Yardımcı olabilirsem buradayım."))
+                )
+            )
+        }
+        if (f.contains("agliyorum") || f.contains("ağlıyorum") || f.contains("gozlerim doldu") || f.contains("gözlerim doldu")) {
+            lastTopic = "dert"
+            return Answer("Kıyamam sana$hi. Ağlamak ayıp değil, rahatlatır insanı. Sarılma gönderiyorum sana. Anlatmak ister misin, ne oldu?")
+        }
+        // Dedikodu / muhabbet: günlük sohbet
+        if (f.contains("dedikodu") || f.contains("muhabbet edelim") || f.contains("biraz konusali") || f.contains("biraz konuşalım") || f.contains("havadan sudan") || f.contains("ne var ne yok")) {
+            return Answer(
+                Persona.pick(
+                    appCtx,
+                    listOf(
+                        Persona.V("Dedikodu mu, bayılırım! Ama bende malzeme yok, sen anlat$hi. Sende ne var ne yok?", true),
+                        Persona.V("Ooo muhabbet zamanı! Bugün başına ilginç bir şey geldi mi, anlat bakalım.")
+                    ),
+                    listOf(
+                        Persona.V("Muhabbete varım! Günün nasıl geçti, anlat bakalım?"),
+                        Persona.V("Sohbet edelim. Sende yenilik var mı, neler oluyor?")
+                    ),
+                    listOf(Persona.V("Sohbet etmekten memnuniyet duyarım. Gününüz nasıl geçti?"))
+                )
+            )
+        }
+        if (f.contains("dertleselim") || f.contains("dertleşelim") || f.contains("icimi dokeyim") || f.contains("içimi dökeyim") || f.contains("dinler misin") || f.contains("beni dinle")) {
+            lastTopic = "dert"
+            return Answer("Dinliyorum$hi, dök içini. Burada sadece sen ve ben varız.")
         }
         if (f.contains("iyi misin")) {
             return Answer("İyiyim, teşekkürler. Sen iyi misin?")

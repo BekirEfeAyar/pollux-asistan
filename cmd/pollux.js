@@ -1385,9 +1385,12 @@ async function answer(raw) {
   const f = fold(cmd);
   const tokens = f.split(' ').map((t) => t.trim()).filter(Boolean);
   const shortMsg = tokens.length <= 3;
+  rememberFrom(raw, f);
+  const sc = supportContinue(f);
+  if (sc) return sc;
 
   if ((shortMsg && !tokens.includes('misin') && (['merhaba', 'selam', 'selamlar', 'slm', 'mrb', 'hey', 'gunaydin', 'gunaydinlar', 'iyi', 'aksamlar'].some((w) => tokens.includes(w)) || f.includes('iyi aksam') || f.includes('iyi gunler'))) || f === 'naber') {
-    return 'Merhaba! Ben Pollux, senin asistanın. Sana nasıl yardımcı olabilirim?';
+    return 'Merhaba' + hiName() + '! Ben Pollux, senin asistanın. Sana nasıl yardımcı olabilirim?';
   }
   if (f.includes('iyi geceler') || f.includes('iyi uykular')) return 'İyi geceler! Tatlı rüyalar.';
   if (f.includes('nasilsin') || f.includes('naslsin') || f.includes('nasil gidiyor') || f.includes('naber') || f.includes('ne haber')) {
@@ -1419,7 +1422,69 @@ async function answer(raw) {
     return pick(['Kıyamam. Sana bir fıkra anlatayım mı? Ya da bilmece sorayım, ne dersin?', 'Anlıyorum, öyle günler olur. Biraz kafanı dağıtayım: şaka mı istersin, fal mı?', 'Sıkıntıyı birlikte dağıtalım. Taş-kağıt-makas oynayalım mı?']);
   }
   if (f.includes('moralim bozuk') || f.includes('moralsizim') || f.includes('uzgunum') || f.includes('uzgnum') || f.includes('depresyondayim') || f.includes('yalnizim') || f.includes('yalniz hissediyorum')) {
-    return pick(['Üzüldüm. Ama şunu bil: ben hep buradayım, dinlerim. Anlatmak ister misin?', 'Kötü hissetmek insani bir şey, geçecek. İstersen sana moral vereyim, ister misin?', 'Yanındayım. Derin bir nefes al, sonra içini dök. Dinliyorum.']);
+    support = { topic: 'moral', n: 2 };
+    return personaPick(
+      [C('Üzüldüm' + hiName() + '. Ama şunu bil: ben hep buradayım, dinlerim. Anlatmak ister misin?'), C('Kıyamam sana. Kötü hissetmek insani bir şey, geçecek. İçini dök hadi, dinliyorum.', true)],
+      [C('Üzüldüm. Ama şunu bil: ben hep buradayım, dinlerim. Anlatmak ister misin?'), C('Kötü hissetmek insani bir şey, geçecek. İstersen sana moral vereyim, ister misin?'), C('Yanındayım. Derin bir nefes al, sonra içini dök. Dinliyorum.')],
+      [C('Üzüldüğünüzü duymak beni de üzdü. Anlatmak isterseniz dinliyorum.')]
+    );
+  }
+  // Ayrilik / is / okul / kavga / uyku: derin dertlesme
+  if (f.includes('ayrildik') || f.includes('ayrıldık') || f.includes('sevgilimden ayrildim') || f.includes('terk edildim') || f.includes('aldatildim') || f.includes('aldatıldım')) {
+    support = { topic: 'ayrilik', n: 2 };
+    return personaPick(
+      [C('Çok zor bir şey bu' + hiName() + ', kıyamam. Zaman her şeyin ilacı derler, gerçekten öyle. Anlatmak ister misin, dinliyorum?', true), C('Ah be... Kalp kırıklığı kolay geçmiyor biliyorum. Ama atlatacaksın, inan bana. İçini dök hadi.')],
+      [C('Ayrılık acısı zordur, bunu yaşaman normal. Zamanla hafifleyecek. Anlatmak istersen dinliyorum.'), C('Üzüldüm. Kendine zaman tanı, acele etme. Buradayım, anlatabilirsin.')],
+      [C('Üzüntünüzü paylaşıyorum. Zamanla düzelecektir, anlatmak isterseniz dinliyorum.')]
+    );
+  }
+  if (f.includes('isten kovuldum') || f.includes('isten ayrildim') || f.includes('issizim') || f.includes('is bulamiyorum') || f.includes('patronum')) {
+    support = { topic: 'is', n: 2 };
+    return personaPick(
+      [C('İş konusu can sıkıcı' + hiName() + ', haklısın. Ama bu bir son değil, yeni bir kapı. Durumu anlat, birlikte bakalım?', true), C('Zor dönemden geçiyorsun belli. Pes etmek yok, daha iyisi seni bekliyor. Anlat hadi.')],
+      [C('İş hayatında böyle dönemler olur, geçici. Neler yaşadığını anlatırsan birlikte düşünelim.'), C('Anlıyorum, streslisin. Adım adım çözelim, önce anlat bakalım ne oldu?')],
+      [C('Durumu anlıyorum. Detay verirseniz yardımcı olmaya çalışırım.')]
+    );
+  }
+  if ((f.includes('sinav') && (f.includes('stres') || f.includes('korkuyorum') || f.includes('calisamiyorum') || f.includes('calışamıyorum') || f.includes('var') || f.includes('kazanamam'))) || f.includes('ders calisamiyorum') || f.includes('ders çalışamıyorum')) {
+    support = { topic: 'sinav', n: 2 };
+    return personaPick(
+      [C('Sınav stresi herkeste olur' + hiName() + ', yalnız değilsin. Küçük parçalara böl, tek tek hallet. Hangi ders sıkıştırıyor, anlat?', true), C('Panik yapma, nefes al. Planlı çalışınca hepsi hallolur. Nerede takıldın söyle bakalım.')],
+      [C('Sınav kaygısı normaldir. Konuları parçalara bölüp program yapalım mı? Hangi ders zorluyor?'), C('Stres yapma, adım adım ilerleyelim. Önce durumunu anlat, plan kuralım.')],
+      [C('Sınav stresi için düzenli program öneririm. Hangi konuda yardımcı olayım?')]
+    );
+  }
+  if (f.includes('kavga ettik') || f.includes('kavga ettim') || f.includes('tartistik') || f.includes('tartıştık') || f.includes('kus kaldik') || f.includes('küs kaldık') || f.includes('kustuk')) {
+    support = { topic: 'kavga', n: 2 };
+    return personaPick(
+      [C('Kavga sonrası iç sıkıntısı normal' + hiName() + '. Kimle, ne oldu anlat; belki barışmanın yolunu buluruz?', true), C('Ah, tatsız olmuş. Biraz sakinleş, sonra konuşmak daha kolay olur. Anlat hadi, dinliyorum.')],
+      [C('Kavga etmek insanidir, önemli olan sonrası. Anlatmak istersen dinliyorum, birlikte düşünelim.'), C('Üzüldüm. Olayı anlatırsan nasıl düzeltebileceğine bakalım.')],
+      [C('Yaşanan tatsızlık için üzgünüm. Anlatırsanız yardımcı olmaya çalışırım.')]
+    );
+  }
+  if (f.includes('uyuyamiyorum') || f.includes('uyuyamıyorum') || f.includes('uykusuzum') || f.includes('uyku tutmuyor') || f.includes('uyku tutmuyo')) {
+    support = { topic: 'uyku', n: 2 };
+    return personaPick(
+      [C('Uyku kaçtı demek' + hiName() + '. Telefonu bırak, ılık bir şey iç, derin nefes al. Ben buradayım, muhabbet edelim mi?', true), C('Gece uykusuzluğu zordur. Aklındakileri anlat, belki rahatlarsın. Dinliyorum.')],
+      [C('Uykusuzluk zorlar. Ekranı kapatıp rahatlamayı dene, aklındakileri anlatırsan dinlerim.'), C('Gece boyu düşünmek yorar. İçini dök, sonra uyumayı dene. Buradayım.')],
+      [C('Uykusuzluk için ekranı kapatıp dinlenmeyi öneririm. Yardımcı olabilirsem buradayım.')]
+    );
+  }
+  if (f.includes('agliyorum') || f.includes('ağlıyorum') || f.includes('gozlerim doldu') || f.includes('gözlerim doldu')) {
+    support = { topic: 'aglama', n: 2 };
+    return 'Kıyamam sana' + hiName() + '. Ağlamak ayıp değil, rahatlatır insanı. Sarılma gönderiyorum sana. Anlatmak ister misin, ne oldu?';
+  }
+  // Dedikodu / muhabbet: gunluk sohbet
+  if (f.includes('dedikodu') || f.includes('muhabbet edelim') || f.includes('biraz konusali') || f.includes('biraz konuşalım') || f.includes('havadan sudan') || f.includes('ne var ne yok')) {
+    return personaPick(
+      [C('Dedikodu mu, bayılırım! Ama bende malzeme yok, sen anlat' + hiName() + '. Sende ne var ne yok?', true), C('Ooo muhabbet zamanı! Bugün başına ilginç bir şey geldi mi, anlat bakalım.')],
+      [C('Muhabbete varım! Günün nasıl geçti, anlat bakalım?'), C('Sohbet edelim. Sende yenilik var mı, neler oluyor?')],
+      [C('Sohbet etmekten memnuniyet duyarım. Gününüz nasıl geçti?')]
+    );
+  }
+  if (f.includes('dertleselim') || f.includes('dertleşelim') || f.includes('icimi dokeyim') || f.includes('içimi dökeyim') || f.includes('dinler misin') || f.includes('beni dinle')) {
+    support = { topic: 'dert', n: 2 };
+    return 'Dinliyorum' + hiName() + ', dök içini. Burada sadece sen ve ben varız.';
   }
   if (f.includes('iyi misin')) return 'İyiyim, teşekkürler. Sen iyi misin?';
   if (tokens.includes('iyiyim') || tokens.includes('iyiyimdir')) {
@@ -1458,6 +1523,28 @@ async function answer(raw) {
     f.includes('kodla') || f.includes('yazdi') || tokens.includes('sahibin') ||
     tokens.includes('sahibi') || f.includes('moderator') || f.includes('yapimci'));
   if (whoMade) return CREDIT;
+
+  // Hafiza: adini sorar, kendini anlatir, unutur
+  if (f.includes('adimi biliyor musun') || f.includes('adim ne') || f.includes('adimi hatirliyor musun') || f.includes('benim adim ne')) {
+    return memory.name
+      ? 'Tabii' + hiName() + ', adın ' + memory.name + '. Unutmam.'
+      : 'Henüz adını söylemedin. Adın ne? Söyle, aklımda tutayım.';
+  }
+  if (f.includes('beni taniyor musun') || f.includes('beni tanıyormusun') || f.includes('hakkimda ne biliyorsun') || f.includes('hakkımda ne biliyorsun') || f.includes('benim hakkimda')) {
+    const s = memorySummary();
+    return s || 'Daha yeniyiz, birbirimizi tanıyoruz. Adını söylersen aklımda tutarım, sevdiklerini anlatırsan unutmam.';
+  }
+  if (f.includes('ne demistim') || f.includes('ne demiştim') || f.includes('dun ne konustuk') || f.includes('dün ne konuştuk') || f.includes('hatirliyor musun') || f.includes('hatırlıyor musun')) {
+    if (memory.facts.length) return 'Aklımda kalanlar: ' + memory.facts.slice(0, 3).join('; ') + '. Başka bir şey de anlatabilirsin.';
+    if (memory.name) return hiName().trim() + ', adını biliyorum ama başka bir notum yok. Anlat, aklımda tutayım.';
+    return 'Henüz bana özel bir şey anlatmadın. Anlatırsan unutmam.';
+  }
+  if (f.includes('adimi unut') || f.includes('adımı unut') || f.includes('beni unut') || f.includes('hafizani temizle') || f.includes('hafızanı temizle')) {
+    memory = { name: '', likes: [], dislikes: [], facts: [], mood: '', updated: Date.now() };
+    saveMemory();
+    support = { topic: '', n: 0 };
+    return 'Tamam, hakkındaki her şeyi unuttum. Tertemiz bir sayfa açtık.';
+  }
 
   if (f.includes('adin ne') || f.includes('ismin ne') || f.includes('kimsin') || f.includes('sen nesin')) {
     return "Ben Pollux, senin asistanın. İnternet yokken bile çalışırım; internet varken araştırma da yaparım.";
@@ -1928,6 +2015,102 @@ function personaPrompt() {
     'meraklı, bazen soru soran, robot gibi değil arkadaş gibi konuşan. ' + stil + ' ';
 }
 
+// ---------- kalici hafiza: seni tanirim, unutmam ----------
+// memory.json %APPDATA%/pollux altinda; oturumlar arasi yasar.
+const MEMORY_FILE = require('path').join(userDataDir(), 'memory.json');
+const CHATS_FILE = require('path').join(userDataDir(), 'chats.json');
+let memory = { name: '', likes: [], dislikes: [], facts: [], mood: '', updated: 0 };
+try {
+  const m = JSON.parse(fs.readFileSync(MEMORY_FILE, 'utf8'));
+  for (const k of ['name', 'likes', 'dislikes', 'facts', 'mood']) {
+    if (m[k] !== undefined) memory[k] = m[k];
+  }
+  if (!Array.isArray(memory.likes)) memory.likes = [];
+  if (!Array.isArray(memory.dislikes)) memory.dislikes = [];
+  if (!Array.isArray(memory.facts)) memory.facts = [];
+} catch (e) {}
+function saveMemory() {
+  try { memory.updated = Date.now(); fs.writeFileSync(MEMORY_FILE, JSON.stringify(memory), 'utf8'); } catch (e) {}
+}
+function hiName() { return memory.name ? ' ' + memory.name : ''; }
+function pushUnique(arr, v, cap) {
+  v = String(v).trim().replace(/[.!]+$/, '');
+  if (v.length < 2 || v.length > 80) return false;
+  if (arr.some((x) => x.toLocaleLowerCase('tr') === v.toLocaleLowerCase('tr'))) return false;
+  arr.unshift(v);
+  while (arr.length > cap) arr.pop();
+  return true;
+}
+// Her mesajdan ipuclari yakala: ad, sevdikleri, onemli olaylar, ruh hali
+function rememberFrom(raw, f) {
+  let changed = false;
+  try {
+    let nm = '';
+    let m = /(?:benim ad[ıi]m|ad[ıi]m)\s+([A-Za-zÇçĞğİıÖöŞşÜü]{2,20})/.exec(raw);
+    if (m) nm = m[1];
+    if (!nm) {
+      m = /^ben\s+([A-ZÇĞİÖŞÜ][a-zçğıöşü]{1,19})[.!]*$/.exec(raw.trim());
+      if (m && !/^(çok|bir|ben|sen|o|bu|şu|de|da|mi|ne|çok)$/i.test(m[1])) nm = m[1];
+    }
+    if (nm) {
+      nm = nm[0].toLocaleUpperCase('tr') + nm.slice(1);
+      if (memory.name !== nm) { memory.name = nm; changed = true; }
+    }
+    // seviyorum / sevmiyorum (seni icermeyen)
+    if (!f.includes('seni')) {
+      m = /(.+?)\s+(?:'ı|'i|'u|'ü|yı|yi|yu|yü)?\s*çok seviyorum/.exec(f);
+      if (m && pushUnique(memory.likes, m[1], 20)) changed = true;
+      m = /(.+?)\s+(?:hiç\s+)?sevmiyorum|(.+?)den nefret ediyorum|(.+?)dan nefret ediyorum/.exec(f);
+      const bad = m ? (m[1] || m[2] || m[3] || '') : '';
+      if (bad && pushUnique(memory.dislikes, bad, 20)) changed = true;
+    }
+    // onemli olaylar: yarin sinavim var, bugun toplantim var...
+    m = /(yar[ıi]n|bug[üu]n|haftaya|pazartesi|sal[ıi]|çarşamba|carsamba|perşembe|persembe|cuma|cumartesi|pazar)\s+(.{2,60}?)\s*(var|olacak|girecegim|gireceğim)/.exec(f);
+    if (m) {
+      const fact = (m[1] + ' ' + m[2] + ' ' + m[3]).trim();
+      if (pushUnique(memory.facts, fact, 30)) changed = true;
+    }
+    // yakinlar: kedim hasta, oglum okula basladi...
+    m = /(kedim|kopegim|k[öo]peğim|oglum|oğlum|k[ıi]z[ıi]m|kardeşim|kardesim|annem|babam|eşim|esim|arkadaşım|arkadasim)\s+(.{2,60})/.exec(f);
+    if (m) {
+      if (pushUnique(memory.facts, (m[1] + ' ' + m[2]).trim(), 30)) changed = true;
+    }
+    // ruh hali
+    if (/(çok mutluyum|cok mutluyum|harikay[ıi]m|keyfim yerinde|bugun guzel gun)/.test(f)) {
+      if (memory.mood !== 'mutlu') { memory.mood = 'mutlu'; changed = true; }
+    } else if (/(uzgunum|moralim bozuk|agliyorum|stresliyim|yalnizim|depresyondayim|canim sikiliyor)/.test(f)) {
+      if (memory.mood !== 'uzgun') { memory.mood = 'uzgun'; changed = true; }
+    }
+  } catch (e) {}
+  if (changed) saveMemory();
+  return changed;
+}
+function memorySummary() {
+  const parts = [];
+  if (memory.name) parts.push('adın ' + memory.name);
+  if (memory.likes.length) parts.push('sevdiklerin: ' + memory.likes.slice(0, 3).join(', '));
+  if (memory.dislikes.length) parts.push('sevmediklerin: ' + memory.dislikes.slice(0, 3).join(', '));
+  if (memory.facts.length) parts.push('notlarım: ' + memory.facts.slice(0, 3).join('; '));
+  if (!parts.length) return '';
+  return 'Senin hakkında bildiklerim — ' + parts.join(' • ') + '.';
+}
+// Destek modu: dertlesmeden sonraki kisa cevaplara sicak devam cumlesi
+let support = { topic: '', n: 0 };
+const SUPPORT_SHORT = ['tamam', 'tmm', 'evet', 'hı', 'hmm', 'anladım', 'anladim', 'oyle', 'öyle', 'aynen', 'hayır', 'hayir', 'yok', 'sağ ol', 'sag ol', 'teşekkürler', 'tesekkurler', 'saol', 'eyvallah', 'peki', 'hı hı'];
+function supportContinue(f) {
+  if (support.n <= 0) return null;
+  const t = f.trim();
+  if (t.length > 60 || t.includes('?')) return null;
+  if (!SUPPORT_SHORT.some((s) => t === s || t.startsWith(s + ' '))) return null;
+  support.n--;
+  if (support.n <= 0) support = { topic: '', n: 0 };
+  return pick([
+    'Yanındayım. İstersen biraz daha anlat, dinliyorum.',
+    'Anlıyorum. Kendine yüklenme fazla, zamanla düzelir. Buradayım.',
+    'Haklısın, kolay değil. Nefes al, ben buradayım.' + (memory.name ? ' ' + memory.name + '.' : ''),
+  ]);
+}
+
 // ---------- baglanti uyarisi ----------
 function extractUrls(text) {
   const out = [];
@@ -1996,11 +2179,89 @@ async function tuiLoop() {
   const stdin = process.stdin, stdout = process.stdout;
   const { w, h } = tuiSize();
   const state = {
-    input: '', cursor: 0, lines: [], offset: 0,
+    input: '', cursor: 0,
+    tabs: [], active: 0, tabN: 0,
     status: "My Links'e tıkla / F1 / /link • PgUp/PgDn: kaydır • çıkış: /cikis",
-    statusUntil: 0, busy: false, pendingUrls: [],
+    statusUntil: 0, busy: false,
     linkRow: 0, linkCol: 0, dots: 0,
   };
+  const cur = () => state.tabs[state.active];
+  function newTabObj(name) {
+    return { name, lines: [], offset: 0, pendingUrls: [], ctx: { lastTopic: '', lastTitle: '', lastContext: '' } };
+  }
+  function saveCtx(t) {
+    try { t.ctx = { lastTopic, lastTitle, lastContext }; } catch (e) {}
+  }
+  function loadCtx(t) {
+    try {
+      const c = (t && t.ctx) || {};
+      lastTopic = c.lastTopic || ''; lastTitle = c.lastTitle || ''; lastContext = c.lastContext || '';
+    } catch (e) {}
+  }
+  function saveTabs() {
+    try {
+      const data = state.tabs.map((t) => ({ name: t.name, lines: t.lines.slice(-120), ctx: t.ctx }));
+      fs.writeFileSync(CHATS_FILE, JSON.stringify({ tabs: data, active: state.active, tabN: state.tabN }), 'utf8');
+    } catch (e) {}
+  }
+  function loadTabs() {
+    try {
+      const d = JSON.parse(fs.readFileSync(CHATS_FILE, 'utf8'));
+      if (d && Array.isArray(d.tabs) && d.tabs.length) {
+        state.tabs = d.tabs.slice(0, 12).map((t, i) => ({
+          name: String(t.name || ('Sohbet ' + (i + 1))).slice(0, 24),
+          lines: Array.isArray(t.lines) ? t.lines.filter((m) => m && typeof m.para === 'string').slice(-120) : [],
+          offset: 0, pendingUrls: [],
+          ctx: t.ctx || { lastTopic: '', lastTitle: '', lastContext: '' },
+        }));
+        state.active = Math.max(0, Math.min(d.active || 0, state.tabs.length - 1));
+        state.tabN = d.tabN || state.tabs.length;
+        return;
+      }
+    } catch (e) {}
+    state.tabs = [newTabObj('Sohbet 1')];
+    state.active = 0;
+    state.tabN = 1;
+  }
+  function tabBar(w) {
+    let s = DIM + '▎' + RESET;
+    state.tabs.forEach((t, i) => {
+      const label = ' ' + (t.name || ('Sohbet ' + (i + 1))).slice(0, 16) + ' ';
+      s += i === state.active
+        ? GOLD + '▎' + RESET + BRIGHT + label + RESET + GOLD + '▎' + RESET
+        : DIM + label + RESET + DIM + '│' + RESET;
+    });
+    s += ' ' + DIM + '+' + RESET;
+    const hint = 'Ctrl+T yeni • Ctrl+W kapat • Ctrl+←/→ geç';
+    const room = Math.max(0, w - visibleLen(s) - visibleLen(hint) - 1);
+    if (room > 0) s += ' '.repeat(room) + DIM + hint + RESET;
+    return s;
+  }
+  function openTab() {
+    if (state.tabs.length >= 12) { flash('En fazla 12 sekme'); render(); return; }
+    saveCtx(cur());
+    state.tabN++;
+    const t = newTabObj('Sohbet ' + state.tabN);
+    state.tabs.push(t);
+    state.active = state.tabs.length - 1;
+    loadCtx(t);
+    state.input = ''; state.cursor = 0;
+    saveTabs(); render();
+  }
+  function closeTab() {
+    if (state.tabs.length <= 1) { flash('Son sekme kapatılamaz'); render(); return; }
+    state.tabs.splice(state.active, 1);
+    state.active = Math.min(state.active, state.tabs.length - 1);
+    loadCtx(cur());
+    saveTabs(); render();
+  }
+  function moveTab(d) {
+    if (state.tabs.length <= 1) return;
+    saveCtx(cur());
+    state.active = (state.active + d + state.tabs.length) % state.tabs.length;
+    loadCtx(cur());
+    saveTabs(); render();
+  }
   const DIM = '\x1b[2m', BRIGHT = '\x1b[1m', RESET = '\x1b[0m';
   const AGRAY = '\x1b[38;5;250m', GREEN = '\x1b[92m', MRED = '\x1b[31m';
   const GRAY = '\x1b[90m', GOLD = '\x1b[33m', BOXBG = '\x1b[48;5;236m';
@@ -2058,10 +2319,11 @@ async function tuiLoop() {
 
   function push(text, who, topics) {
     // Ham paragraf sakla; sarma + renklendirme render'da (pencere boyuna uyar)
+    const tab = cur();
     for (const para of String(text).split('\n')) {
-      state.lines.push({ para, who, topics: who === 'a' ? (topics || []) : [] });
+      tab.lines.push({ para, who, topics: who === 'a' ? (topics || []) : [] });
     }
-    while (state.lines.length > 300) state.lines.shift();
+    while (tab.lines.length > 200) tab.lines.shift();
   }
   // Konu kelimelerini yesil yap (buyuk-kucuk harf duyarsiz; uzun once)
   function greenTopics(line, topics) {
@@ -2095,11 +2357,11 @@ async function tuiLoop() {
     const logoX = Math.max(0, Math.floor((w - logoW) / 2));
     const colW = Math.min(w - 8, 92);
     const colX = Math.max(0, Math.floor((w - colW) / 2));
-    const histRows = Math.max(1, h - 15);
+    const histRows = Math.max(1, h - 16);
     // Gorunen satirlar (paragraf bosluklari dahil)
     function expanded() {
       const rows = [];
-      for (const m of state.lines) {
+      for (const m of cur().lines) {
         const body = m.who === 'u' ? '> ' + m.para : m.para;
         for (const ln of tuiWrap(body, colW)) rows.push({ t: ln, who: m.who, topics: m.topics });
         rows.push({ gap: true });
@@ -2108,11 +2370,12 @@ async function tuiLoop() {
       return rows;
     }
     const rows = expanded();
-    const off = Math.min(state.offset, Math.max(0, rows.length - histRows));
-    state.offset = off;
+    const off = Math.min(cur().offset, Math.max(0, rows.length - histRows));
+    cur().offset = off;
     const tail = off === 0 ? rows.slice(-histRows)
       : rows.slice(Math.max(0, rows.length - histRows - off), rows.length - off);
     const frame = [];
+    frame.push(tabBar(w));
     for (const row of logo) frame.push(' '.repeat(logoX) + row);
     frame.push('');
     for (const ln of tail) {
@@ -2185,26 +2448,31 @@ async function tuiLoop() {
   }
   async function submit() {
     const t = state.input.trim();
-    state.input = ''; state.cursor = 0; state.offset = 0;
+    const tab = cur();
+    state.input = ''; state.cursor = 0; tab.offset = 0;
     if (!t) { render(); return; }
     if (t === '/cikis' || t === '/exit' || t === 'cikis' || t === 'exit' || t === 'quit') {
-      cleanup(); process.exit(0); return;
+      saveCtx(tab); saveTabs(); cleanup(); process.exit(0); return;
     }
     if (t === '/link' || t === 'linklerim' || t === 'linkler') {
       push(t, 'u'); openUrl(LINKS_URL); flash('Bağlantıların açılıyor...');
-      render(); return;
+      saveTabs(); render(); return;
     }
-    if (/^[0-9]+$/.test(t) && state.pendingUrls.length) {
+    if (/^[0-9]+$/.test(t) && tab.pendingUrls.length) {
       const n = parseInt(t, 10);
-      if (n >= 1 && n <= state.pendingUrls.length) {
-        openUrl(state.pendingUrls[n - 1]);
-        flash('Açılıyor: ' + state.pendingUrls[n - 1]);
+      if (n >= 1 && n <= tab.pendingUrls.length) {
+        openUrl(tab.pendingUrls[n - 1]);
+        flash('Açılıyor: ' + tab.pendingUrls[n - 1]);
       }
-      state.pendingUrls = [];
-      render(); return;
+      tab.pendingUrls = [];
+      saveTabs(); render(); return;
     }
     push(t, 'u');
-    state.busy = true; state.pendingUrls = []; state.dots = 0;
+    if (/^Sohbet \d+$/.test(tab.name || '')) {
+      tab.name = t.length > 18 ? t.slice(0, 18) + '…' : t;
+    }
+    loadCtx(tab);
+    state.busy = true; tab.pendingUrls = []; state.dots = 0;
     render();
     const spin = setInterval(() => {
       if (!state.busy) { clearInterval(spin); return; }
@@ -2220,7 +2488,8 @@ async function tuiLoop() {
       // Akici yaz: once tum metni paragrafla, sonra kelime kelime buyut
       const paras = String(out).split('\n');
       const msg = { para: '', who: 'a', topics };
-      state.lines.push(msg);
+      tab.lines.push(msg);
+      while (tab.lines.length > 200) tab.lines.shift();
       const full = paras.join('\n');
       const words = full.split(/(\s+)/);
       let wi = 0;
@@ -2242,13 +2511,15 @@ async function tuiLoop() {
       const rest = urls.filter((u) => !isDirectUrl(u));
       for (const u of direct) openUrl(u);
       if (rest.length) {
-        state.pendingUrls = rest;
+        tab.pendingUrls = rest;
         push('[!] Açmak için numarayı yaz (' + rest.map((u, i) => (i + 1) + ') ' + u).join('  ') + ')', 'a');
       }
+      saveCtx(tab); saveTabs();
     } catch (e) {
       clearInterval(spin);
       state.busy = false;
       push('Hata: ' + e.message, 'a');
+      saveTabs();
     }
     render();
   }
@@ -2284,6 +2555,8 @@ async function tuiLoop() {
   stdin.setRawMode(true);
   stdin.resume();
   stdout.write('\x1b[?1000h\x1b[?1006h');
+  loadTabs();
+  loadCtx(cur());
   await splashLoad();
   render();
   process.on('SIGWINCH', () => { needClear = true; render(); });
@@ -2293,8 +2566,17 @@ async function tuiLoop() {
     const str = decoder.write(chunk);
     // F1 / F2: baglantilari acar (fare calismazsa garanti yol)
     if (str === '\x1bOP' || str === '\x1bOQ') { openLinks(); return; }
+    // Ctrl+T yeni sekme, Ctrl+W kapat
+    if (str.includes('\x14')) { openTab(); return; }
+    if (str.includes('\x17')) { closeTab(); return; }
     // Fare SGR: ESC [ < b ; x ; y M/m
     mouseBuf += str;
+    const ctab = mouseBuf.match(/\x1b\[1;5([DC])/);
+    if (ctab) {
+      mouseBuf = '';
+      moveTab(ctab[1] === 'C' ? 1 : -1);
+      return;
+    }
     const m = mouseBuf.match(/\x1b\[<(\d+);(\d+);(\d+)([Mm])/);
     if (m) {
       mouseBuf = '';
@@ -2317,14 +2599,18 @@ async function tuiLoop() {
     if (mouseBuf.length > 32) mouseBuf = '';
     if (str.startsWith('\x1b[') && !m) {
       if (str === '\x1b[5~') { // PgUp: geriye sar
-        state.offset = Math.min(state.lines.length, state.offset + Math.max(1, tuiSize().h - 12));
+        cur().offset = Math.min(cur().lines.length, cur().offset + Math.max(1, tuiSize().h - 12));
         render(); return;
       }
       if (str === '\x1b[6~') { // PgDn: asagiya
-        state.offset = Math.max(0, state.offset - Math.max(1, tuiSize().h - 12));
+        cur().offset = Math.max(0, cur().offset - Math.max(1, tuiSize().h - 12));
         render(); return;
       }
-      return; // ok tuslari vb. yoksay
+      if (str === '\x1b[D' && state.cursor > 0) { state.cursor--; render(); return; } // Sol
+      if (str === '\x1b[C' && state.cursor < state.input.length) { state.cursor++; render(); return; } // Sag
+      if (str === '\x1b[H') { state.cursor = 0; render(); return; } // Home
+      if (str === '\x1b[F') { state.cursor = state.input.length; render(); return; } // End
+      return; // diger ozel tuslari yoksay
     }
     for (const ch of str) {
       if (ch === '\x03' || ch === '\x1b') { cleanup(); process.exit(0); return; } // Ctrl+C / Esc

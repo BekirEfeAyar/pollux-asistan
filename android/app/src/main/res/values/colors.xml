@@ -13,15 +13,4 @@
     <color name="err">#D9534F</color>
     <color name="launcher_bg">#17171A</color>
     <color name="onGold">#141414</color>
-    <!-- Pollux tasarım rehberi paleti -->
-    <color name="kagit">#F7F3EC</color>
-    <color name="yuzey">#FFFCF6</color>
-    <color name="yuzey_kullanici">#EDE6DA</color>
-    <color name="murekkep">#1F2328</color>
-    <color name="soluk">#7C766B</color>
-    <color name="cizgi">#E2DACB</color>
-    <color name="kiremit">#C2543B</color>
-    <color name="kiremit_uzeri">#FFFFFF</color>
-    <color name="adacayi">#5E7B6A</color>
-    <color name="uyari">#B3382C</color>
 </resources>

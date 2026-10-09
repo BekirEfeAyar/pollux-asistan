@@ -48,15 +48,7 @@ class ChatBrain(
         data class OpenUrl(val url: String) : Action
     }
 
-    data class Answer(val text: String, val action: Action? = null, val source: String? = null)
-
-    private fun liveSource(): String {
-        return try {
-            "Canlı veri · " + java.text.SimpleDateFormat("HH:mm", java.util.Locale("tr")).format(java.util.Date())
-        } catch (_: Exception) {
-            "Canlı veri"
-        }
-    }
+    data class Answer(val text: String, val action: Action? = null)
 
     private val main = Handler(Looper.getMainLooper())
 
@@ -761,7 +753,7 @@ class ChatBrain(
                 if (g0 != null) researcher.weatherNow(g0) else researcher.weatherNow("İstanbul")
             } catch (_: Exception) { null }
             if (w != null) {
-                return Answer(w + (if (g0 != null) "" else " (İstanbul için gösterdim, şehir yazarsan onunkini söylerim.)"), source = liveSource())
+                return Answer(w + (if (g0 != null) "" else " (İstanbul için gösterdim, şehir yazarsan onunkini söylerim.)"))
             }
             return Answer("O şehrin havasını bulamadım. Şehir adını net yazmayı dene.")
         }
@@ -782,7 +774,7 @@ class ChatBrain(
             if (keys.isEmpty()) {
                 return Answer("Kurlara şu an ulaşamadım. Biraz sonra tekrar dene.")
             }
-            return Answer("Güncel kurlar (TCMB satış):\n" + keys.joinToString("\n") { "- ${names[it]}: ${r[it]} TL" }, source = liveSource())
+            return Answer("Güncel kurlar (TCMB satış):\n" + keys.joinToString("\n") { "- ${names[it]}: ${r[it]} TL" })
         }
 
         // ---- Dünya saatleri (offline, cihaz saatinden hesaplanır) ----
@@ -990,7 +982,7 @@ class ChatBrain(
                     if (!exp.isNullOrBlank()) {
                         val full = exp + "\n(Derinleştirme)"
                         learned.add("$lastTopic detay", full)
-                        return Answer(full, source = liveSource())
+                        return Answer(full)
                     }
                 } catch (_: Exception) {}
             }
@@ -1010,8 +1002,7 @@ class ChatBrain(
                     if (g != null) {
                         return Answer(
                             g.name + (if (g.country.isNotBlank()) " (${g.country})" else "") +
-                                " burada: https://www.google.com/maps/search/?api=1&query=${g.lat},${g.lon}",
-                            source = liveSource()
+                                " burada: https://www.google.com/maps/search/?api=1&query=${g.lat},${g.lon}"
                         )
                     }
                 } catch (_: Exception) {}
@@ -1054,7 +1045,7 @@ class ChatBrain(
             }
             lastTitle = r.title
             lastContext = r.answer
-            return Answer(full, source = liveSource())
+            return Answer(full)
         }
         try {
             ai.ask(query)?.let {
@@ -1066,7 +1057,7 @@ class ChatBrain(
                 }
                 lastTitle = ""
                 lastContext = ""
-                return Answer("$it\n(Yapay zeka yanıtı)", source = liveSource())
+                return Answer("$it\n(Yapay zeka yanıtı)")
             }
         } catch (_: Exception) {}
         // Zorunlu araştırma bile boş döndüyse bankadaki kısa cevaba düş

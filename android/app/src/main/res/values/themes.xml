@@ -1,24 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.SesliAsistan" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="android:textColorPrimary">@color/murekkep</item>
-        <item name="android:textColorSecondary">@color/soluk</item>
-        <item name="android:textColorHint">@color/soluk</item>
+        <item name="android:textColorPrimary">@color/ink</item>
+        <item name="android:textColorSecondary">@color/muted</item>
+        <item name="android:textColorHint">@color/muted</item>
         <item name="android:editTextStyle">@style/Widget.SesliAsistan.EditText</item>
-        <item name="android:windowBackground">@color/kagit</item>
-        <item name="android:statusBarColor">@color/kagit</item>
-        <item name="android:navigationBarColor">@color/kagit</item>
-        <item name="colorPrimary">@color/kiremit</item>
-        <item name="colorOnPrimary">@color/kiremit_uzeri</item>
-        <item name="colorSecondary">@color/kiremit</item>
-        <item name="colorAccent">@color/kiremit</item>
-        <item name="colorSurface">@color/yuzey</item>
-        <item name="colorOnSurface">@color/murekkep</item>
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="colorPrimary">@color/gold</item>
+        <item name="colorOnPrimary">@color/onGold</item>
+        <item name="colorSecondary">@color/gold</item>
+        <item name="colorSurface">@color/card</item>
+        <item name="colorOnSurface">@color/ink</item>
     </style>
 
     <style name="Widget.SesliAsistan.EditText" parent="Widget.AppCompat.EditText">
-        <item name="android:textColor">@color/murekkep</item>
-        <item name="android:textColorHint">@color/soluk</item>
+        <item name="android:textColor">@color/ink</item>
+        <item name="android:textColorHint">@color/muted</item>
         <item name="android:background">@null</item>
     </style>
 </resources>

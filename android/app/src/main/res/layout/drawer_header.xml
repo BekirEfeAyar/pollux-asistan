@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="@drawable/header_gradient"
+    android:padding="18dp">
+
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="52dp"
+        android:layout_height="52dp"
+        app:cardCornerRadius="26dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="@color/bg"
+        app:strokeColor="@color/gold"
+        app:strokeWidth="2dp">
+
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@drawable/avatar_default" />
+    </com.google.android.material.card.MaterialCardView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginStart="12dp">
+
+        <TextView
+            android:id="@+id/drawerName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Kullanıcı"
+            android:textColor="@color/ink"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/drawerMail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="eposta"
+            android:textColor="@color/muted"
+            android:textSize="13sp" />
+    </LinearLayout>
+</LinearLayout>

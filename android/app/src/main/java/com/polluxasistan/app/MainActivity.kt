@@ -47,11 +47,11 @@ class MainActivity : AppCompatActivity() {
                         runOnUiThread {
                             android.widget.Toast.makeText(this@MainActivity, msg, android.widget.Toast.LENGTH_SHORT).show()
                         }
-                    }, { ok ->
+                    }, { ok, err ->
                         runOnUiThread {
                             android.widget.Toast.makeText(
                                 this@MainActivity,
-                                if (ok) "Tam veri seti hazır (10M kayıt)" else "İndirme başarısız",
+                                if (ok) "Tam veri seti hazır (10M kayıt)" else "İndirilemedi: $err",
                                 android.widget.Toast.LENGTH_LONG
                             ).show()
                         }

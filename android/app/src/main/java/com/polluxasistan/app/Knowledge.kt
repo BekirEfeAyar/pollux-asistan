@@ -28,7 +28,13 @@ class Knowledge(private val ctx: Context) {
 
     private fun load(): List<Entry> {
         return try {
-            val json = ctx.assets.open("knowledge.json").bufferedReader().use { it.readText() }
+            // Once indirilen tam set, yoksa paketteki 100K set
+            val full = File(ctx.filesDir, "knowledge.json")
+            val json = if (full.exists() && full.length() > 1000000) {
+                full.bufferedReader().use { it.readText() }
+            } else {
+                ctx.assets.open("knowledge.json").bufferedReader().use { it.readText() }
+            }
             val arr = JSONObject(json).getJSONArray("entries")
             List(arr.length()) { i ->
                 val o = arr.getJSONObject(i)
@@ -51,7 +57,7 @@ class Knowledge(private val ctx: Context) {
      * Tam veri seti (10M kayit) indirilebilir. Acilista 100K kayitla baslar,
      * kullanici indirse 1GB gzip dosyasi cikarilir.
      */
-    fun downloadFullDataset(onProgress: (Int, String) -> Unit, onDone: (Boolean) -> Unit) {
+    fun downloadFullDataset(onProgress: (Int, String) -> Unit, onDone: (Boolean, String) -> Unit) {
         Thread {
             try {
                 val url = URL("https://github.com/BekirEfeAyar/pollux-asistan/releases/download/v2.0.23-data/knowledge.json.gz")
@@ -59,6 +65,15 @@ class Knowledge(private val ctx: Context) {
                     connectTimeout = 30000
                     readTimeout = 300000
                     requestMethod = "GET"
+                    setRequestProperty("User-Agent", "PolluxAsistan/1.0")
+                    instanceFollowRedirects = true
+                }
+                conn.connect()
+                val code = conn.responseCode
+                if (code !in 200..299) {
+                    val msg = "Sunucu hatası: HTTP $code"
+                    Handler(Looper.getMainLooper()).post { onDone(false, msg) }
+                    return@Thread
                 }
                 val total = conn.contentLength
                 val tmpFile = File(ctx.filesDir, "knowledge.json.gz")
@@ -86,9 +101,9 @@ class Knowledge(private val ctx: Context) {
                     }
                 }
                 tmpFile.delete()
-                Handler(Looper.getMainLooper()).post { onDone(true) }
+                Handler(Looper.getMainLooper()).post { onDone(true, "") }
             } catch (e: Exception) {
-                Handler(Looper.getMainLooper()).post { onDone(false) }
+                Handler(Looper.getMainLooper()).post { onDone(false, e.message ?: "Bilinmeyen hata") }
             }
         }.start()
     }

@@ -2415,10 +2415,11 @@ async function tuiLoop() {
     try { sizeTimer.unref(); } catch (e) {}
   }
 
-  // Acilis animasyonu: donen imlec + ilerleme cubugu (bilgi bankasi yuklenirken)
+  // Acilis animasyonu: donen imlec + ilerleme cubugu + sure (tam ekran duzen)
   async function splashLoad() {
     const SPIN = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
     let si = 0, done = 0, total = 1, finished = false;
+    const t0 = Date.now();
     const draw = () => {
       const { w, h } = tuiSize();
       const logo = logoLines();
@@ -2434,9 +2435,31 @@ async function tuiLoop() {
       const bw2 = Math.min(34, w - 10);
       const fill = Math.round(pct * bw2);
       const bx2 = Math.max(0, Math.floor((w - (bw2 + 6)) / 2));
-      lines.push(' '.repeat(bx2) + DIM + '[' + RESET + GREEN + '━'.repeat(fill) + RESET + DIM + '─'.repeat(Math.max(0, bw2 - fill)) + RESET + DIM + ']' + RESET + ' ' + AGRAY + Math.round(pct * 100) + '%' + RESET);
-      const pad = Math.max(0, Math.floor((h - lines.length) / 2));
-      stdout.write('\x1b[H\x1b[2J\x1b[?25l' + '\n'.repeat(pad) + lines.join('\n'));
+      let detail = ' ' + AGRAY + Math.round(pct * 100) + '%' + RESET;
+      if (total > 1048576) {
+        detail += DIM + ' • ' + Math.round(done / 1048576) + '/' + Math.round(total / 1048576) + 'MB' + RESET;
+        const el = (Date.now() - t0) / 1000;
+        if (!finished && done > 10485760 && el > 3) {
+          const secs = Math.round((el * (total - done)) / done);
+          detail += DIM + ' • ~' + (secs >= 90 ? Math.round(secs / 60) + ' dk' : Math.max(1, secs) + ' sn') + ' kaldı' + RESET;
+        }
+      }
+      lines.push(' '.repeat(bx2) + DIM + '[' + RESET + GREEN + '━'.repeat(fill) + RESET + DIM + '─'.repeat(Math.max(0, bw2 - fill)) + RESET + DIM + ']' + RESET + detail);
+      const foot = 'İlk açılışta tam veri seti yüklenir (bir kez) • Wi-Fi önerilir';
+      const footShow = foot.length > w - 2 ? foot.slice(0, w - 2) : foot;
+      const fx = Math.max(0, Math.floor((w - visibleLen(footShow)) / 2));
+      const padTop = Math.max(0, Math.floor((h - lines.length - 2) / 2));
+      const frame = [];
+      for (let i = 0; i < padTop; i++) frame.push('');
+      for (const ln of lines) frame.push(ln);
+      while (frame.length < h - 1) frame.push('');
+      frame.push(' '.repeat(fx) + DIM + footShow + RESET);
+      const out = frame.slice(0, h).map((ln) => {
+        const v = visibleLen(ln);
+        return v < w ? ln + RESET + ' '.repeat(w - v) : ln;
+      });
+      stdout.write('\x1b[H\x1b[?25l' + (needClear ? '\x1b[2J' : '') + out.join('\n'));
+      needClear = false;
     };
     draw();
     const timer = setInterval(() => { si++; draw(); }, 90);

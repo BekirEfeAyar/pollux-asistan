@@ -79,6 +79,19 @@ object Prefs {
         else -> "Hassas"
     }
 
+    /** Yazı boyutu: 0 küçük, 1 normal, 2 büyük */
+    fun fontScale(ctx: Context): Int = p(ctx).getInt("font_scale", 1).coerceIn(0, 2)
+
+    fun setFontScale(ctx: Context, v: Int) {
+        p(ctx).edit().putInt("font_scale", v.coerceIn(0, 2)).apply()
+    }
+
+    fun fontFactor(ctx: Context): Float = when (fontScale(ctx)) {
+        0 -> 0.9f
+        2 -> 1.15f
+        else -> 1.0f
+    }
+
     fun avatarFile(ctx: Context): java.io.File = java.io.File(ctx.filesDir, "avatar.jpg")
 
     /** Tema: 0 sistem, 1 açık, 2 koyu */

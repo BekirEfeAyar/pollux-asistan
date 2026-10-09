@@ -1,138 +1,167 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<androidx.drawerlayout.widget.DrawerLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/drawer"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg">
-
+    android:background="@color/kagit"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical">
+    <!-- Üst bar -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical">
-
+        android:layout_height="56dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp">
+        <TextView
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:background="@drawable/bg_monogram"
+            android:fontFamily="serif"
+            android:gravity="center"
+            android:text="P"
+            android:textColor="@color/murekkep"
+            android:textSize="15sp" />
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:fontFamily="sans-serif-medium"
+            android:text="@string/app_name"
+            android:textColor="@color/murekkep"
+            android:textSize="17sp" />
+        <View
+            android:id="@+id/readyDot"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:background="@drawable/dot_ready" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="@string/ready_offline"
+            android:textColor="@color/soluk"
+            android:textSize="13sp" />
+        <ImageButton
+            android:id="@+id/menuBtn"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="-12dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/menu_desc"
+            android:src="@drawable/ic_menu" />
+    </LinearLayout>
+    <!-- Karşılama ve mesajlar -->
+    <ScrollView
+        android:id="@+id/scroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:scrollbars="none">
         <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
-            android:background="@drawable/header_gradient">
-
-            <ImageButton
-                android:id="@+id/menuBtn"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/ic_menu"
-                android:tint="@color/ink"
-                android:contentDescription="Menü" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Pollux"
-                android:textColor="@color/ink"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:gravity="center" />
-
-            <View
-                android:id="@+id/netDot"
-                android:layout_width="10dp"
-                android:layout_height="10dp"
-                android:layout_marginEnd="4dp"
-                android:background="@drawable/dot_ok" />
-
-            <ImageButton
-                android:id="@+id/newChatBtn"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/ic_edit"
-                android:tint="@color/ink"
-                android:contentDescription="Yeni sohbet" />
-        </LinearLayout>
-
-        <LinearLayout
+            android:id="@+id/content"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:weightSum="2"
-            android:background="@color/bg">
-
+            android:orientation="vertical"
+            android:padding="20dp">
             <LinearLayout
-                android:layout_width="0dp"
+                android:id="@+id/introBox"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:gravity="center">
-
+                android:orientation="vertical">
                 <TextView
-                    android:id="@+id/tabText"
+                    android:id="@+id/greeting"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="serif"
+                    android:text="Günaydın."
+                    android:textColor="@color/murekkep"
+                    android:textSize="28sp" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/need_anything"
+                    android:textColor="@color/soluk"
+                    android:textSize="17sp" />
+                <HorizontalScrollView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Yazılı Konuşma"
-                    android:gravity="center"
-                    android:paddingTop="10dp"
-                    android:paddingBottom="6dp"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <View
-                    android:id="@+id/tabTextLine"
-                    android:layout_width="64dp"
-                    android:layout_height="3dp"
-                    android:background="@color/gold" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:gravity="center">
-
+                    android:layout_marginTop="16dp"
+                    android:scrollbars="none">
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+                        <LinearLayout
+                            android:id="@+id/chipsRow1"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal" />
+                        <LinearLayout
+                            android:id="@+id/chipsRow2"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:orientation="horizontal" />
+                    </LinearLayout>
+                </HorizontalScrollView>
                 <TextView
-                    android:id="@+id/tabVoice"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:text="@string/menu_links"
+                    android:textColor="@color/soluk"
+                    android:textSize="13sp" />
+                <LinearLayout
+                    android:id="@+id/linksBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Sesli Konuşma"
-                    android:gravity="center"
-                    android:paddingTop="10dp"
-                    android:paddingBottom="6dp"
-                    android:textSize="14sp" />
-
-                <View
-                    android:id="@+id/tabVoiceLine"
-                    android:layout_width="64dp"
-                    android:layout_height="3dp"
-                    android:background="@color/gold"
-                    android:visibility="invisible" />
+                    android:layout_marginTop="4dp"
+                    android:orientation="vertical" />
             </LinearLayout>
         </LinearLayout>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/line" />
-
-        <FrameLayout
-            android:id="@+id/fragmentBox"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+    </ScrollView>
+    <!-- Giriş çubuğu -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="20dp"
+        android:layout_marginBottom="12dp"
+        android:background="@drawable/bg_input"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="20dp"
+        android:paddingEnd="6dp">
+        <EditText
+            android:id="@+id/input"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@null"
+            android:hint="@string/input_hint"
+            android:imeOptions="actionSend"
+            android:inputType="textCapSentences"
+            android:maxLines="4"
+            android:textColor="@color/murekkep"
+            android:textColorHint="@color/soluk"
+            android:textSize="16sp" />
+        <ImageButton
+            android:id="@+id/micBtn"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/mic_desc"
+            android:src="@drawable/ic_mic" />
+        <ImageButton
+            android:id="@+id/send"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_send_idle"
+            android:contentDescription="@string/send_desc"
+            android:src="@drawable/ic_send" />
     </LinearLayout>
-
-    <com.google.android.material.navigation.NavigationView
-        android:id="@+id/nav"
-        android:layout_width="300dp"
-        android:layout_height="match_parent"
-        android:layout_gravity="start"
-        android:background="@color/bg"
-        app:itemIconTint="@color/gold"
-        app:itemTextColor="@color/ink"
-        app:headerLayout="@layout/drawer_header"
-        app:menu="@menu/drawer_menu" />
-</androidx.drawerlayout.widget.DrawerLayout>
+</LinearLayout>

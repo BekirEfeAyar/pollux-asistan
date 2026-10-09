@@ -8,6 +8,7 @@
         <item name="android:windowBackground">@color/kagit</item>
         <item name="android:statusBarColor">@color/kagit</item>
         <item name="android:navigationBarColor">@color/kagit</item>
+        <item name="android:windowLightStatusBar">false</item>
         <item name="colorPrimary">@color/kiremit</item>
         <item name="colorOnPrimary">@color/kiremit_uzeri</item>
         <item name="colorSecondary">@color/kiremit</item>

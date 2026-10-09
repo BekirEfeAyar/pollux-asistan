@@ -2152,10 +2152,11 @@ const LOGO_RAW = [
   '#     #   # #      #      #   # #   #',
   '#      ###  #####  #####   ###  #   #',
 ];
+const TERM = { w: process.stdout.columns || 80, h: process.stdout.rows || 24 };
 function tuiSize() {
   return {
-    w: Math.max(40, process.stdout.columns || 80),
-    h: Math.max(20, process.stdout.rows || 24),
+    w: Math.max(40, TERM.w || process.stdout.columns || 80),
+    h: Math.max(20, TERM.h || process.stdout.rows || 24),
   };
 }
 function tuiWrap(text, width) {
@@ -2319,6 +2320,57 @@ async function tuiLoop() {
       out.push(line.replace(/\s+$/, ''));
     }
     return out;
+  }
+
+  // Terminalin bildirdigi gercek gorunur alan.
+  // Windows'ta konsol pencere boyutu (conhost tampon boyunu verebilir);
+  // digerlerinde DSR/CPR sorgusu, en sonda stdout degeri.
+  function queryTermSize() {
+    return new Promise((resolve) => {
+      // Konsol yoksa (boru/harness) stdout degerlerine dokunma
+      if (process.platform === 'win32' && stdout.isTTY) {
+        try {
+          const cp = require('child_process');
+          cp.execFile(
+            'powershell.exe',
+            ['-noprofile', '-command', '(Get-Host).UI.RawUI.WindowSize.Width; (Get-Host).UI.RawUI.WindowSize.Height'],
+            { timeout: 3000, windowsHide: true },
+            (err, so) => {
+              if (!err) {
+                const parts = String(so || '').trim().split(/\s+/).map((x) => parseInt(x, 10));
+                if (parts.length >= 2 && parts[0] > 0 && parts[1] > 0) {
+                  TERM.w = parts[0]; TERM.h = parts[1];
+                  resolve();
+                  return;
+                }
+              }
+              dsrFallback(resolve);
+            }
+          );
+          return;
+        } catch (e) {}
+      }
+      dsrFallback(resolve);
+    });
+  }
+  function dsrFallback(resolve) {
+    let done = false;
+    const finish = (w, h) => {
+      if (done) return;
+      done = true;
+      try { stdin.removeListener('data', onData); } catch (e) {}
+      if (w > 0 && h > 0) { TERM.w = w; TERM.h = h; }
+      resolve();
+    };
+    const onData = (chunk) => {
+      let s = '';
+      try { s = chunk.toString('utf8'); } catch (e) {}
+      const m = s.match(/\x1b\[(\d+);(\d+)R/);
+      if (m) finish(parseInt(m[2], 10), parseInt(m[1], 10));
+    };
+    stdin.on('data', onData);
+    try { stdout.write('\x1b[999;999H\x1b[6n'); } catch (e) {}
+    setTimeout(() => finish(0, 0), 400);
   }
 
   // Acilis animasyonu: donen imlec + ilerleme cubugu (bilgi bankasi yuklenirken)
@@ -2634,12 +2686,22 @@ async function tuiLoop() {
 
   stdin.setRawMode(true);
   stdin.resume();
+  // Gercek pencere boyutu: conhost rows degerini tampon boyundan verebilir,
+  // imleci en saga-asagiya atip terminalin raporunu oku (DSR/CPR)
+  try { await queryTermSize(); } catch (e) {}
   stdout.write('\x1b[?1000h\x1b[?1006h');
   loadTabs();
   loadCtx(cur());
   await splashLoad();
+  if (!process.env.WT_SESSION && !process.env.TERM_PROGRAM) {
+    flash('Fare çalışmazsa: Windows Terminal kullan • F1 ve sayı tuşları her zaman çalışır');
+  }
   render();
-  process.on('SIGWINCH', () => { needClear = true; render(); });
+  process.on('SIGWINCH', async () => {
+    needClear = true;
+    try { await queryTermSize(); } catch (e) {}
+    render();
+  });
   let mouseBuf = '';
   const decoder = new (require('string_decoder').StringDecoder)('utf8');
   stdin.on('data', async (chunk) => {

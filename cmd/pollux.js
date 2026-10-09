@@ -2391,18 +2391,22 @@ async function tuiLoop() {
     const logo = logoLines();
     const logoW = Math.max(...logo.map(visibleLen));
     const logoX = Math.max(0, Math.floor((w - logoW) / 2));
-    const colW = Math.min(w - 8, 92);
-    const colX = Math.max(0, Math.floor((w - colW) / 2));
+    // Sohbet cercevesi: dis kutu, iceride sagda kullanici / solda asistan
+    const HB = Math.min(w - 4, 100);
+    const hx = Math.max(0, Math.floor((w - HB) / 2));
+    const IW = HB - 2;
+    const wrapW = Math.max(20, IW - 2);
     const histRows = Math.max(1, h - 16);
-    // Gorunen satirlar (paragraf bosluklari dahil)
+    // Gorunen satirlar: mesaj arasi 1, konusma donusu arasi 2 bos satir
     function expanded() {
       const rows = [];
       for (const m of cur().lines) {
         const body = m.who === 'u' ? '> ' + m.para : m.para;
-        for (const ln of tuiWrap(body, colW)) rows.push({ t: ln, who: m.who, topics: m.topics });
+        for (const ln of tuiWrap(body, wrapW)) rows.push({ t: ln, who: m.who, topics: m.topics });
         rows.push({ gap: true });
+        if (m.who === 'a') rows.push({ gap: true });
       }
-      if (rows.length && rows[rows.length - 1].gap) rows.pop();
+      while (rows.length && rows[rows.length - 1].gap) rows.pop();
       return rows;
     }
     const rows = expanded();
@@ -2413,16 +2417,23 @@ async function tuiLoop() {
     const frame = [];
     frame.push(tabBar(w));
     for (const row of logo) frame.push(' '.repeat(logoX) + row);
-    frame.push('');
+    // Sohbet kutusu ustu (aktif sekme adiyla)
+    const boxTitle = ' ✦ ' + (cur().name || 'Sohbet') + ' ';
+    const boxFill = Math.max(0, IW - 1 - visibleLen(boxTitle));
+    frame.push(' '.repeat(hx) + DIM + '┌─' + RESET + BRIGHT + boxTitle + RESET + DIM + '─'.repeat(boxFill) + '┐' + RESET);
+    const framed = (inner, vlen) => {
+      const text = inner + ' '.repeat(Math.max(0, IW - vlen));
+      return ' '.repeat(hx) + DIM + '│' + RESET + text + DIM + '│' + RESET;
+    };
     state.urlRegions = [];
     const HROW = 11; // tail[0] -> terminal 1. satir no
     for (let j = 0; j < tail.length; j++) {
       const ln = tail[j];
-      if (ln.gap) { frame.push(''); continue; }
+      if (ln.gap) { frame.push(framed('', 0)); continue; }
       if (ln.who === 'u') {
-        const pad = Math.max(0, Math.floor((w - visibleLen(ln.t)) / 2));
-        frame.push(' '.repeat(pad) + BRIGHT + ln.t + RESET);
-        collectUrls(ln.t, HROW + j, pad);
+        const pad = Math.max(0, IW - visibleLen(ln.t));
+        frame.push(' '.repeat(hx) + DIM + '│' + RESET + ' '.repeat(pad) + BRIGHT + ln.t + RESET + DIM + '│' + RESET);
+        collectUrls(ln.t, HROW + j, hx + 1 + pad);
       } else {
         let t = ln.t;
         let bar = GREEN;
@@ -2436,13 +2447,13 @@ async function tuiLoop() {
           t = t.replace(/\(Kaynak: [^)]+\)/g, (mm) => MRED + mm + AGRAY)
                .replace(/\(Yapay zeka yanıtı\)/g, (mm) => MRED + mm + AGRAY);
         }
-        frame.push(' '.repeat(colX) + bar + '│ ' + RESET + AGRAY + t + RESET);
-        collectUrls(ln.t, HROW + j, colX + 3);
+        frame.push(framed(' ' + bar + '│ ' + RESET + AGRAY + t + RESET, 3 + visibleLen(ln.t)));
+        collectUrls(ln.t, HROW + j, hx + 1 + 3);
       }
     }
-    while (frame.length < h - 6) frame.push('');
-    // Ayrac cizgisi
-    frame.push(DIM + '─'.repeat(Math.max(0, w)) + RESET);
+    while (frame.length < h - 6) frame.push(framed('', 0));
+    // Sohbet kutusu alti
+    frame.push(' '.repeat(hx) + DIM + '└' + '─'.repeat(Math.max(0, IW)) + '┘' + RESET);
     // Giris kutusu (yuvarlak, altin cerceve)
     const bw = Math.min(w - 8, 64);
     const bx = Math.max(0, Math.floor((w - bw) / 2));

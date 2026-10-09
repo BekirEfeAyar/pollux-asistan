@@ -2224,12 +2224,20 @@ async function tuiLoop() {
     state.tabN = 1;
   }
   function tabBar(w) {
+    state.tabRegions = [];
     let s = DIM + '▎' + RESET;
+    let x = 1;
     state.tabs.forEach((t, i) => {
       const label = ' ' + (t.name || ('Sohbet ' + (i + 1))).slice(0, 16) + ' ';
-      s += i === state.active
-        ? GOLD + '▎' + RESET + BRIGHT + label + RESET + GOLD + '▎' + RESET
-        : DIM + label + RESET + DIM + '│' + RESET;
+      const x0 = x;
+      if (i === state.active) {
+        s += GOLD + '▎' + RESET + BRIGHT + label + RESET + GOLD + '▎' + RESET;
+        x += 2 + visibleLen(label);
+      } else {
+        s += DIM + label + RESET + DIM + '│' + RESET;
+        x += visibleLen(label) + 1;
+      }
+      state.tabRegions.push({ i, x0, x1: x });
     });
     s += ' ' + DIM + '+' + RESET;
     const hint = 'Ctrl+T yeni • Ctrl+W kapat • Ctrl+←/→ geç';
@@ -2257,10 +2265,38 @@ async function tuiLoop() {
   }
   function moveTab(d) {
     if (state.tabs.length <= 1) return;
+    switchToTab((state.active + d + state.tabs.length) % state.tabs.length);
+  }
+  function switchToTab(i) {
+    if (i === state.active || i < 0 || i >= state.tabs.length) return;
     saveCtx(cur());
-    state.active = (state.active + d + state.tabs.length) % state.tabs.length;
+    state.active = i;
     loadCtx(cur());
+    state.input = ''; state.cursor = 0;
     saveTabs(); render();
+  }
+  // Tiklanabilir baglanti bolgeleri (render'da hesaplanir)
+  function collectUrls(plain, row, base0) {
+    try {
+      const seen = new Set();
+      for (const u of extractUrls(plain)) {
+        if (seen.has(u)) continue;
+        seen.add(u);
+        let needle = u, idx = plain.indexOf(needle);
+        if (idx < 0) {
+          needle = u.replace(/^https?:\/\//, '');
+          idx = plain.indexOf(needle);
+          if (idx < 0) {
+            needle = 'www.' + needle;
+            idx = plain.indexOf(needle);
+          }
+        }
+        while (idx >= 0) {
+          state.urlRegions.push({ url: u, row, x0: base0 + idx, x1: base0 + idx + needle.length });
+          idx = plain.indexOf(needle, idx + 1);
+        }
+      }
+    } catch (e) {}
   }
   const DIM = '\x1b[2m', BRIGHT = '\x1b[1m', RESET = '\x1b[0m';
   const AGRAY = '\x1b[38;5;250m', GREEN = '\x1b[92m', MRED = '\x1b[31m';
@@ -2378,10 +2414,15 @@ async function tuiLoop() {
     frame.push(tabBar(w));
     for (const row of logo) frame.push(' '.repeat(logoX) + row);
     frame.push('');
-    for (const ln of tail) {
+    state.urlRegions = [];
+    const HROW = 11; // tail[0] -> terminal 1. satir no
+    for (let j = 0; j < tail.length; j++) {
+      const ln = tail[j];
       if (ln.gap) { frame.push(''); continue; }
       if (ln.who === 'u') {
-        frame.push(' '.repeat(Math.max(0, Math.floor((w - visibleLen(ln.t)) / 2))) + BRIGHT + ln.t + RESET);
+        const pad = Math.max(0, Math.floor((w - visibleLen(ln.t)) / 2));
+        frame.push(' '.repeat(pad) + BRIGHT + ln.t + RESET);
+        collectUrls(ln.t, HROW + j, pad);
       } else {
         let t = ln.t;
         let bar = GREEN;
@@ -2396,6 +2437,7 @@ async function tuiLoop() {
                .replace(/\(Yapay zeka yanıtı\)/g, (mm) => MRED + mm + AGRAY);
         }
         frame.push(' '.repeat(colX) + bar + '│ ' + RESET + AGRAY + t + RESET);
+        collectUrls(ln.t, HROW + j, colX + 3);
       }
     }
     while (frame.length < h - 6) frame.push('');
@@ -2414,6 +2456,7 @@ async function tuiLoop() {
     const shown = text.length > fw ? text.slice(text.length - fw) : text;
     const cursorInShown = Math.min(shown.length, Math.max(0, state.cursor - (text.length - shown.length)));
     frame.push(' '.repeat(bx) + GOLD + '│' + RESET + ' ' + GOLD + '›' + RESET + ' ' + BRIGHT + shown + RESET + ' '.repeat(Math.max(0, fw - shown.length)) + GOLD + '│' + RESET);
+    state.inputGeom = { row: h - 2, x0: bx + 4, len: shown.length, win: text.length - shown.length };
     frame.push(' '.repeat(bx) + GOLD + '╰' + '─'.repeat(Math.max(0, bw - 2)) + '╯' + RESET);
     // Alt durum satiri: ~ solda, My Links sagda
     const link = 'My Links';
@@ -2544,9 +2587,35 @@ async function tuiLoop() {
       render();
     }
   }
-  function onLinkClick(x, y) {
+  function onMouseClick(x, y) {
+    // Sekmeler (1. satir)
+    if (y === 1 && state.tabRegions) {
+      for (const r of state.tabRegions) {
+        if (x - 1 >= r.x0 && x - 1 < r.x1) { switchToTab(r.i); return true; }
+      }
+      return false;
+    }
+    // My Links
     if (y === state.linkRow && x >= state.linkCol && x < state.linkCol + 8) {
       openLinks();
+      return true;
+    }
+    // Sohbetteki baglanti: tikla, dogrudan ac
+    if (state.urlRegions) {
+      for (const r of state.urlRegions) {
+        if (r.row === y && x - 1 >= r.x0 && x - 1 < r.x1) {
+          try { openUrl(r.url); } catch (e) {}
+          flash('Açılıyor: ' + r.url);
+          render();
+          return true;
+        }
+      }
+    }
+    // Giris kutusuna tikla: imleci oraya koy
+    const g = state.inputGeom;
+    if (g && y === g.row && x - 1 >= g.x0 && x - 1 <= g.x0 + g.len) {
+      state.cursor = Math.max(0, Math.min(state.input.length, g.win + (x - 1 - g.x0)));
+      render();
       return true;
     }
     return false;
@@ -2582,7 +2651,7 @@ async function tuiLoop() {
       mouseBuf = '';
       const btn = parseInt(m[1], 10);
       if (m[4] === 'M' && (btn === 0 || btn === 1)) {
-        onLinkClick(parseInt(m[2], 10), parseInt(m[3], 10));
+        onMouseClick(parseInt(m[2], 10), parseInt(m[3], 10));
       }
       return;
     }
@@ -2592,7 +2661,7 @@ async function tuiLoop() {
       mouseBuf = '';
       const btn = leg[1].charCodeAt(0) - 32;
       if (btn === 0 || btn === 1) {
-        onLinkClick(leg[2].charCodeAt(0) - 32, leg[3].charCodeAt(0) - 32);
+        onMouseClick(leg[2].charCodeAt(0) - 32, leg[3].charCodeAt(0) - 32);
       }
       return;
     }

@@ -147,11 +147,11 @@ class MainActivity : AppCompatActivity() {
         themeLight = findViewById(R.id.themeLight)
         themeDark = findViewById(R.id.themeDark)
 
-        // Çekmece ana sütunu iter
+        // Standart çekmece davranışı (itme efekti kapalı: dokunma eşlemesi bozulmasın)
         drawer.addDrawerListener(object : DrawerLayout.DrawerListener {
             override fun onDrawerSlide(v: View, o: Float) {
                 try {
-                    mainCol.translationX = o * drawerView.width
+                    mainCol.translationX = 0f
                 } catch (_: Exception) {}
             }
             override fun onDrawerOpened(v: View) {}

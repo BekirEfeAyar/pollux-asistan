@@ -60,6 +60,31 @@ class ChatBrain(
         }
     }
 
+    /**
+     * Yapay zeka/research motorundan gelen tanıtım/reklam satırlarını temizler.
+     * (Ücretsiz köprüler bazen "powered by" türü satırlar ekler.)
+     * Normal bilgi metnine dokunmaz.
+     */
+    private fun cleanAiText(t: String): String {
+        return try {
+            var s = t.replace(
+                Regex("https?://[^\\s()\"']*pollinations[^\\s()\"']*", RegexOption.IGNORE_CASE),
+                ""
+            )
+            val bad = listOf(
+                "pollinations", "powered by", "sponsorlu", "sponsored",
+                "adsbygoogle", "doubleclick", "taboola", "outbrain", "revcontent",
+                "advertisement"
+            )
+            s = s.lines().filter { line ->
+                bad.none { line.contains(it, ignoreCase = true) }
+            }.joinToString("\n")
+            s.replace(Regex("\n{3,}"), "\n\n").trim()
+        } catch (_: Exception) {
+            t
+        }
+    }
+
     private val main = Handler(Looper.getMainLooper())
 
     fun answer(text: String, allowApps: Boolean, cb: (Answer) -> Unit) {
@@ -1055,6 +1080,7 @@ class ChatBrain(
             var synth: String? = null
             try {
                 synth = researcher.synthesizeTR(query, r.answer, r.source)
+                    ?.let { cleanAiText(it) }?.ifBlank { null }
             } catch (_: Exception) {
                 synth = null
             }
@@ -1078,15 +1104,18 @@ class ChatBrain(
         }
         try {
             ai.ask(query)?.let {
-                learned.add(query, "$it\n(Yapay zeka yanıtı)")
-                lastTopic = try {
-                    researcher.cleanTopic(query).ifBlank { query }
-                } catch (_: Exception) {
-                    query
+                val clean = cleanAiText(it)
+                if (clean.length >= 30) {
+                    learned.add(query, "$clean\n(Yapay zeka yanıtı)")
+                    lastTopic = try {
+                        researcher.cleanTopic(query).ifBlank { query }
+                    } catch (_: Exception) {
+                        query
+                    }
+                    lastTitle = ""
+                    lastContext = ""
+                    return Answer("$clean\n(Yapay zeka yanıtı)", source = liveSource())
                 }
-                lastTitle = ""
-                lastContext = ""
-                return Answer("$it\n(Yapay zeka yanıtı)", source = liveSource())
             }
         } catch (_: Exception) {}
         // Zorunlu araştırma bile boş döndüyse bankadaki kısa cevaba düş

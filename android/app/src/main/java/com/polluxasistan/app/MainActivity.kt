@@ -725,7 +725,7 @@ class MainActivity : AppCompatActivity() {
         if (saved.startsWith("CARD::")) {
             val parts = saved.removePrefix("CARD::").split("||")
             if (parts.size >= 3) {
-                addCardView(parts[0], parts[1], parts[2], animate)
+                addCardView(parts[0], parts[1], animate)
                 return
             }
         }
@@ -745,12 +745,8 @@ class MainActivity : AppCompatActivity() {
                     } catch (_: Exception) {}
                 }
             } catch (_: Exception) {}
-            if (!source.isNullOrBlank()) {
-                src.text = source
-                src.visibility = View.VISIBLE
-            } else {
-                src.visibility = View.GONE
-            }
+            // Kaynak satırı istek üzerine gizli
+            src.visibility = View.GONE
             body.setOnLongClickListener {
                 try {
                     val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
@@ -759,19 +755,20 @@ class MainActivity : AppCompatActivity() {
                 } catch (_: Exception) {}
                 true
             }
+            // Kaynak satırı istek üzerine gizli
+            src.visibility = View.GONE
             content.addView(v)
             if (animate) enterAnim(v)
             scrollDown()
         } catch (_: Exception) {}
     }
 
-    private fun addCardView(title: String, sub: String, source: String, animate: Boolean = true) {
+    private fun addCardView(title: String, sub: String, animate: Boolean = true) {
         try {
             val v = LayoutInflater.from(this).inflate(R.layout.item_result_card, content, false)
             v.findViewById<TextView>(R.id.cardTitle).text = title
             v.findViewById<TextView>(R.id.cardSub).text = sub
             content.addView(v)
-            addAssistantView(source, null, false)
             if (animate) enterAnim(v)
             scrollDown()
         } catch (_: Exception) {}
@@ -866,7 +863,7 @@ class MainActivity : AppCompatActivity() {
                     hideTyping()
                     if (ans.card != null) {
                         addAssistantView(ans.text, null)
-                        addCardView(ans.card.title, ans.card.sub, ans.card.source)
+                        addCardView(ans.card.title, ans.card.sub)
                     } else {
                         addAssistantView(ans.text, ans.source ?: "Bilgi bankası · çevrimdışı")
                     }

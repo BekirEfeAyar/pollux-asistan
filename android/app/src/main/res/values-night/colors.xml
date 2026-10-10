@@ -13,4 +13,18 @@
     <color name="err">#E57373</color>
     <color name="launcher_bg">#17171A</color>
     <color name="onGold">#141414</color>
+    <!-- Pollux HTML tema paleti (koyu) -->
+    <color name="kagit">#17191B</color>
+    <color name="yuzey">#202427</color>
+    <color name="yuzey_kullanici">#2A2F33</color>
+    <color name="murekkep">#ECE7DE</color>
+    <color name="soluk">#9A9588</color>
+    <color name="cizgi">#30363A</color>
+    <color name="kiremit">#E27D60</color>
+    <color name="kiremit_uzeri">#1A1210</color>
+    <color name="adacayi">#86A793</color>
+    <color name="uyari">#E8776B</color>
+    <color name="cekmece">#1C1F21</color>
+    <color name="dis">#0D0E0F</color>
+    <color name="perde">#8C000000</color>
 </resources>

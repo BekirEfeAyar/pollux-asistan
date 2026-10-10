@@ -1,138 +1,405 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <androidx.drawerlayout.widget.DrawerLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/drawer"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg">
-
+    android:background="@color/dis"
+    android:fitsSystemWindows="true">
+    <!-- Çekmece -->
     <LinearLayout
-        android:layout_width="match_parent"
+        android:id="@+id/drawerView"
+        android:layout_width="320dp"
         android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:background="@color/cekmece"
         android:orientation="vertical">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
-            android:background="@drawable/header_gradient">
-
-            <ImageButton
-                android:id="@+id/menuBtn"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/ic_menu"
-                android:tint="@color/ink"
-                android:contentDescription="Menü" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Pollux"
-                android:textColor="@color/ink"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:gravity="center" />
-
-            <View
-                android:id="@+id/netDot"
-                android:layout_width="10dp"
-                android:layout_height="10dp"
-                android:layout_marginEnd="4dp"
-                android:background="@drawable/dot_ok" />
-
-            <ImageButton
-                android:id="@+id/newChatBtn"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/ic_edit"
-                android:tint="@color/ink"
-                android:contentDescription="Yeni sohbet" />
-        </LinearLayout>
-
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:weightSum="2"
-            android:background="@color/bg">
-
+            android:paddingStart="16dp"
+            android:paddingTop="8dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="8dp">
             <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="40dp"
                 android:layout_weight="1"
-                android:orientation="vertical"
-                android:gravity="center">
-
-                <TextView
-                    android:id="@+id/tabText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Yazılı Konuşma"
-                    android:gravity="center"
-                    android:paddingTop="10dp"
-                    android:paddingBottom="6dp"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <View
-                    android:id="@+id/tabTextLine"
-                    android:layout_width="64dp"
-                    android:layout_height="3dp"
-                    android:background="@color/gold" />
+                android:background="@drawable/bg_search"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp">
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_search" />
+                <EditText
+                    android:id="@+id/searchInput"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:background="@null"
+                    android:hint="Ara"
+                    android:imeOptions="actionSearch"
+                    android:inputType="text"
+                    android:maxLines="1"
+                    android:textColor="@color/murekkep"
+                    android:textColorHint="@color/soluk"
+                    android:textSize="15sp" />
             </LinearLayout>
-
+            <ImageButton
+                android:id="@+id/drawerNew"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Yeni sohbet"
+                android:src="@drawable/ic_edit_new" />
+        </LinearLayout>
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:scrollbars="none">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="8dp"
+                android:paddingTop="4dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="8dp">
+                <LinearLayout
+                    android:id="@+id/navNew"
+                    android:layout_width="match_parent"
+                    android:layout_height="46dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp">
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:src="@drawable/ic_nav_chat" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:text="Yeni sohbet"
+                        android:textColor="@color/murekkep"
+                        android:textSize="16sp" />
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/navLinks"
+                    android:layout_width="match_parent"
+                    android:layout_height="46dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp">
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:src="@drawable/ic_nav_link" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:text="Kısayollarım"
+                        android:textColor="@color/murekkep"
+                        android:textSize="16sp" />
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/navBank"
+                    android:layout_width="match_parent"
+                    android:layout_height="46dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp">
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:src="@drawable/ic_nav_bank" />
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:text="Bilgi bankası"
+                        android:textColor="@color/murekkep"
+                        android:textSize="16sp" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Çevrimdışı"
+                        android:textColor="@color/soluk"
+                        android:textSize="12sp" />
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/navPanel"
+                    android:layout_width="match_parent"
+                    android:layout_height="46dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:visibility="gone">
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:src="@drawable/ic_nav_chat" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:text="Moderatör paneli"
+                        android:textColor="@color/murekkep"
+                        android:textSize="16sp" />
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/histBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </LinearLayout>
+        </ScrollView>
+        <LinearLayout
+            android:id="@+id/meRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="12dp">
+            <ImageView
+                android:id="@+id/avatarSmall"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:background="@drawable/bg_avatar"
+                android:src="@drawable/ic_avatar_default" />
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:id="@+id/profileName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:fontFamily="sans-serif-medium"
+                    android:maxLines="1"
+                    android:text="Efe Ayar"
+                    android:textColor="@color/murekkep"
+                    android:textSize="15sp" />
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+                    <View
+                        android:layout_width="7dp"
+                        android:layout_height="7dp"
+                        android:background="@drawable/dot_ready" />
+                    <TextView
+                        android:id="@+id/profileStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:text="Çevrimdışı hazır"
+                        android:textColor="@color/soluk"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </LinearLayout>
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_dots" />
+        </LinearLayout>
+    </LinearLayout>
+    <!-- Ana sütun -->
+    <LinearLayout
+        android:id="@+id/mainCol"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/kagit"
+        android:orientation="vertical">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
+            <ImageButton
+                android:id="@+id/menuBtn"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Menüyü aç"
+                android:src="@drawable/ic_menu" />
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:orientation="vertical"
-                android:gravity="center">
-
+                android:gravity="center"
+                android:orientation="vertical">
                 <TextView
-                    android:id="@+id/tabVoice"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="Pollux"
+                    android:textColor="@color/murekkep"
+                    android:textSize="16sp" />
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+                    <View
+                        android:layout_width="7dp"
+                        android:layout_height="7dp"
+                        android:background="@drawable/dot_ready" />
+                    <TextView
+                        android:id="@+id/topStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:text="Çevrimdışı hazır"
+                        android:textColor="@color/soluk"
+                        android:textSize="11sp" />
+                </LinearLayout>
+            </LinearLayout>
+            <ImageButton
+                android:id="@+id/topNew"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Yeni sohbet"
+                android:src="@drawable/ic_edit_new" />
+        </LinearLayout>
+        <ScrollView
+            android:id="@+id/scroll"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:scrollbars="none">
+            <LinearLayout
+                android:id="@+id/content"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="20dp"
+                android:paddingTop="8dp"
+                android:paddingEnd="20dp"
+                android:paddingBottom="16dp">
+                <LinearLayout
+                    android:id="@+id/introBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Sesli Konuşma"
-                    android:gravity="center"
-                    android:paddingTop="10dp"
-                    android:paddingBottom="6dp"
-                    android:textSize="14sp" />
-
-                <View
-                    android:id="@+id/tabVoiceLine"
-                    android:layout_width="64dp"
-                    android:layout_height="3dp"
-                    android:background="@color/gold"
-                    android:visibility="invisible" />
+                    android:orientation="vertical">
+                    <TextView
+                        android:id="@+id/greeting"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="36dp"
+                        android:fontFamily="serif"
+                        android:text="Günaydın."
+                        android:textColor="@color/murekkep"
+                        android:textSize="32sp" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:layout_marginBottom="28dp"
+                        android:text="Ne lazım?"
+                        android:textColor="@color/soluk"
+                        android:textSize="17sp" />
+                    <LinearLayout
+                        android:id="@+id/chipsBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="32dp"
+                        android:orientation="vertical" />
+                    <LinearLayout
+                        android:id="@+id/linksHomeBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="4dp"
+                            android:text="Kısayollarım"
+                            android:textColor="@color/soluk"
+                            android:textSize="12sp" />
+                        <LinearLayout
+                            android:id="@+id/linksBox"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+        </ScrollView>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="16dp"
+            android:paddingTop="8dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="12dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:background="@drawable/bg_input"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="20dp"
+                android:paddingEnd="6dp">
+                <EditText
+                    android:id="@+id/input"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@null"
+                    android:hint="Bir şey yaz…"
+                    android:imeOptions="actionSend"
+                    android:inputType="textCapSentences"
+                    android:maxLines="4"
+                    android:textColor="@color/murekkep"
+                    android:textColorHint="@color/soluk"
+                    android:textSize="16sp" />
+                <ImageButton
+                    android:id="@+id/send"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/bg_send_idle"
+                    android:contentDescription="Gönder"
+                    android:src="@drawable/ic_send" />
             </LinearLayout>
         </LinearLayout>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/line" />
-
-        <FrameLayout
-            android:id="@+id/fragmentBox"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
     </LinearLayout>
-
-    <com.google.android.material.navigation.NavigationView
-        android:id="@+id/nav"
-        android:layout_width="300dp"
-        android:layout_height="match_parent"
-        android:layout_gravity="start"
-        android:background="@color/bg"
-        app:itemIconTint="@color/gold"
-        app:itemTextColor="@color/ink"
-        app:headerLayout="@layout/drawer_header"
-        app:menu="@menu/drawer_menu" />
+    <include layout="@layout/sheet_profile" />
 </androidx.drawerlayout.widget.DrawerLayout>

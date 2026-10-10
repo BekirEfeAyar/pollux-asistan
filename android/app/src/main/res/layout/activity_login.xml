@@ -1,174 +1,143 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg"
-    android:fillViewport="true">
-
+    android:background="@color/kagit"
+    android:fitsSystemWindows="true"
+    android:scrollbars="none">
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="28dp"
-        android:gravity="center">
-
-        <com.google.android.material.card.MaterialCardView
+        android:padding="20dp">
+        <TextView
             android:id="@+id/loginAvatar"
-            android:layout_width="96dp"
-            android:layout_height="96dp"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
             android:layout_marginTop="48dp"
-            app:cardCornerRadius="48dp"
-            app:cardElevation="6dp"
-            app:cardBackgroundColor="@color/bg"
-            app:strokeColor="@color/gold"
-            app:strokeWidth="2dp">
-
-            <ImageView
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:src="@drawable/avatar_default" />
-        </com.google.android.material.card.MaterialCardView>
-
+            android:background="@drawable/bg_monogram"
+            android:fontFamily="serif"
+            android:gravity="center"
+            android:text="P"
+            android:textColor="@color/murekkep"
+            android:textSize="15sp" />
         <TextView
             android:id="@+id/loginTitle"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Pollux"
-            android:textColor="@color/ink"
-            android:textSize="26sp"
-            android:textStyle="bold"
-            android:gravity="center"
-            android:layout_marginTop="16dp" />
-
+            android:layout_marginTop="24dp"
+            android:fontFamily="serif"
+            android:text="Hoş geldin."
+            android:textColor="@color/murekkep"
+            android:textSize="28sp" />
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="senin asistanın"
-            android:textColor="@color/muted"
-            android:textSize="14sp"
-            android:gravity="center"
-            android:layout_marginTop="6dp"
-            android:layout_marginBottom="24dp" />
-
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="28dp"
+            android:text="Devam etmek için giriş yap."
+            android:textColor="@color/soluk"
+            android:textSize="17sp" />
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="E-posta"
-            android:textColor="@color/ink"
-            android:textSize="14sp" />
-
-        <EditText
-            android:id="@+id/mailEdit"
-            android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:layout_marginTop="6dp"
-            android:background="@drawable/search_bg"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:hint="ornek@eposta.com"
-            android:inputType="textEmailAddress"
-            android:textColor="@color/ink"
-            android:textColorHint="@color/muted"
-            android:textSize="16sp"
-            android:singleLine="true" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
             android:text="Adın"
-            android:textColor="@color/ink"
-            android:textSize="14sp"
-            android:layout_marginTop="14dp" />
-
+            android:textColor="@color/soluk"
+            android:textSize="12sp" />
         <EditText
             android:id="@+id/nameEdit"
             android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:layout_marginTop="6dp"
-            android:background="@drawable/search_bg"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
+            android:layout_height="46dp"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/bg_field"
             android:hint="Adın"
-            android:textColor="@color/ink"
-            android:textColorHint="@color/muted"
-            android:textSize="16sp"
-            android:singleLine="true" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
+            android:imeOptions="actionNext"
+            android:inputType="textCapWords"
+            android:maxLines="1"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:textColor="@color/murekkep"
+            android:textColorHint="@color/soluk"
+            android:textSize="16sp" />
+        <TextView
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginTop="14dp">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Şifre"
-                android:textColor="@color/ink"
-                android:textSize="14sp" />
-
-            <TextView
-                android:id="@+id/passToggle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Göster"
-                android:textColor="@color/gold"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:padding="8dp" />
-        </LinearLayout>
-
+            android:layout_marginBottom="6dp"
+            android:text="E-posta"
+            android:textColor="@color/soluk"
+            android:textSize="12sp" />
+        <EditText
+            android:id="@+id/mailEdit"
+            android:layout_width="match_parent"
+            android:layout_height="46dp"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/bg_field"
+            android:hint="ornek@eposta.com"
+            android:imeOptions="actionNext"
+            android:inputType="textEmailAddress"
+            android:maxLines="1"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:textColor="@color/murekkep"
+            android:textColorHint="@color/soluk"
+            android:textSize="16sp" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
+            android:text="Şifre"
+            android:textColor="@color/soluk"
+            android:textSize="12sp" />
         <EditText
             android:id="@+id/passEdit"
             android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:layout_marginTop="6dp"
-            android:background="@drawable/search_bg"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:hint="En az 4 karakter"
+            android:layout_height="46dp"
+            android:background="@drawable/bg_field"
+            android:hint="••••"
+            android:imeOptions="actionDone"
             android:inputType="textPassword"
-            android:textColor="@color/ink"
-            android:textColorHint="@color/muted"
-            android:textSize="16sp"
-            android:singleLine="true" />
-
-        <androidx.appcompat.widget.AppCompatButton
+            android:maxLines="1"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:textColor="@color/murekkep"
+            android:textColorHint="@color/soluk"
+            android:textSize="16sp" />
+        <TextView
+            android:id="@+id/passToggle"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:gravity="center_vertical"
+            android:paddingStart="4dp"
+            android:text="Göster"
+            android:textColor="@color/soluk"
+            android:textSize="14sp" />
+        <Button
             android:id="@+id/loginBtn"
             android:layout_width="match_parent"
-            android:layout_height="54dp"
-            android:layout_marginTop="22dp"
-            android:background="@drawable/btn_primary_soft"
-            android:backgroundTint="@null"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_done"
             android:text="Giriş Yap"
-            android:textColor="@color/onGold"
-            android:textSize="16sp"
-            android:textStyle="bold" />
-
-        <androidx.appcompat.widget.AppCompatButton
+            android:textAllCaps="false"
+            android:textColor="@color/kagit"
+            android:textSize="15sp" />
+        <Button
             android:id="@+id/registerBtn"
             android:layout_width="match_parent"
-            android:layout_height="54dp"
-            android:layout_marginTop="10dp"
-            android:background="@drawable/btn_outline"
-            android:backgroundTint="@null"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_field"
             android:text="Hesap Aç"
-            android:textColor="@color/ink"
-            android:textSize="16sp"
-            android:textStyle="bold" />
-
+            android:textAllCaps="false"
+            android:textColor="@color/murekkep"
+            android:textSize="15sp" />
         <TextView
             android:id="@+id/loginInfo"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text=""
-            android:textColor="@color/muted"
-            android:textSize="13sp"
-            android:gravity="center"
-            android:layout_marginTop="12dp" />
-
+            android:layout_marginTop="16dp"
+            android:textColor="@color/soluk"
+            android:textSize="13sp" />
     </LinearLayout>
 </ScrollView>

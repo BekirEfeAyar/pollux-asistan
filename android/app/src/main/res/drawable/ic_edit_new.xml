@@ -3,5 +3,8 @@
     android:viewportWidth="24" android:viewportHeight="24">
     <path android:fillColor="#00000000" android:strokeColor="@color/murekkep"
         android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round"
-        android:pathData="M4,8h16M4,16h10" />
+        android:pathData="M12,4H7a3,3 0,0 0,-3,3v10a3,3 0,0 0,3,3h10a3,3 0,0 0,3,-3v-5" />
+    <path android:fillColor="#00000000" android:strokeColor="@color/murekkep"
+        android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M18.5,3.5l2,2L12,14l-3,1 1,-3z" />
 </vector>

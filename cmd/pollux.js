@@ -2292,6 +2292,7 @@ async function tuiLoop() {
     lastRows: null,
   };
   let needClear = true;
+  let altOn = false;
   let sizeTimer = null;
   let onlineTimer = null;
 
@@ -2350,6 +2351,21 @@ async function tuiLoop() {
       default: return base + C.c.text;
     }
   }
+  // Tam ekran (alt ekran tamponu): kaydirma cubugu olusmaz, cikista onceki ekran aynen geri gelir.
+  function enterScreen() {
+    try { stdout.write('\x1b[?1049h\x1b[2J\x1b[H\x1b[5 q\x1b[?25l'); } catch (e) {}
+    altOn = true;
+    needClear = true;
+  }
+  function leaveScreen() {
+    if (!altOn) return;
+    altOn = false;
+    try { stdout.write('\x1b[0 q\x1b[?25h\x1b[?1049l'); } catch (e) {}
+  }
+  process.on('exit', () => {
+    if (!altOn) return;
+    try { stdout.write('\x1b[?1000l\x1b[?1006l\x1b[0 q\x1b[?25h\x1b[?1049l'); } catch (e) {}
+  });
   function paint(rows) {
     const { w, h } = tuiSize();
     const C = S.C;
@@ -2556,10 +2572,17 @@ async function tuiLoop() {
       }
       const maxOff = Math.max(0, content.length - CH);
       S.offset = Math.max(0, Math.min(S.offset || 0, maxOff));
-      let start;
-      if (!S.lines.length && !S.panel) start = 0;
-      else start = Math.max(0, content.length - CH - S.offset);
-      const view = content.slice(start, start + CH);
+      let view;
+      if (!S.lines.length && !S.panel) {
+        // acilis ekrani dikeyde ortalanir (bos alan dengeli dursun)
+        view = [];
+        const topPad = Math.max(0, Math.floor((CH - content.length) / 2));
+        for (let i = 0; i < topPad; i++) view.push(blank());
+        view.push(...content);
+      } else {
+        const start = Math.max(0, content.length - CH - S.offset);
+        view = content.slice(start, start + CH);
+      }
       while (view.length < CH) view.push(blank());
       for (let i = 0; i < view.length; i++) view[i].screenRow = 3 + i;
       rows.push(...view);
@@ -2578,6 +2601,7 @@ async function tuiLoop() {
       }
       const pseg = [['', ' '.repeat(PAD)], ['a!', '❯ ']];
       pseg.push(['', shown]);
+      if (!S.input && !S.busy && !S.confirmUrl && !S.panel) pseg.push(['d', 'bir şey yaz…']);
       if (ghost) pseg.push(['d', ghost]);
       rows.push(segRow(pseg));
       S.inputGeom = { row: h - 2, x0: PAD + 2, len: shown.length, win: win, col: PAD + 2 + cursorInShown };
@@ -2867,7 +2891,10 @@ async function tuiLoop() {
     try { clearInterval(timer); } catch (e) {}
     try { clearInterval(onlineTimer); } catch (e) {}
     try { if (sizeTimer) clearInterval(sizeTimer); } catch (e) {}
-    try { stdout.write('\x1b[?1000l\x1b[?1006l\x1b[?25h\x1b[0m\n'); } catch (e) {}
+    const wasAlt = altOn;
+    try { stdout.write('\x1b[?1000l\x1b[?1006l\x1b[0m'); } catch (e) {}
+    if (wasAlt) leaveScreen();
+    else { try { stdout.write('\x1b[0 q\x1b[?25h\n'); } catch (e) {} }
     try { stdin.setRawMode(false); } catch (e) {}
     try { stdin.removeAllListeners('data'); } catch (e) {}
   }
@@ -2930,6 +2957,7 @@ async function tuiLoop() {
   }
   async function tuiTestMode() {
     S.plain = process.env.POLLUX_TUI_PLAIN === '1';
+    if (!S.plain && process.env.POLLUX_TUI_ALT === '1') enterScreen();
     TERM.w = parseInt(process.env.POLLUX_TUI_W || '100', 10) || 100;
     TERM.h = parseInt(process.env.POLLUX_TUI_H || '30', 10) || 30;
     loadState();
@@ -2953,6 +2981,7 @@ async function tuiLoop() {
     }
     render();
     if (process.env.POLLUX_TUI_RENDER2 === '1') render();
+    if (process.env.POLLUX_TUI_EXIT === '1') cleanup();
   }
 
   if (process.env.POLLUX_TUI_TEST) { await tuiTestMode(); return; }
@@ -2961,6 +2990,7 @@ async function tuiLoop() {
   S.C = tuiColorCodes(S.theme);
   stdin.setRawMode(true);
   stdin.resume();
+  enterScreen();
   try { await queryTermSize(); } catch (e) {}
   watchTermSize();
   try { stdout.write('\x1b[?1000h\x1b[?1006h'); } catch (e) {}

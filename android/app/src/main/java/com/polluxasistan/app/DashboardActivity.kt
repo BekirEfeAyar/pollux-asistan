@@ -24,7 +24,16 @@ class DashboardActivity : AppCompatActivity() {
             finish()
             return
         }
-        setContentView(R.layout.activity_dashboard)
+        try {
+            setContentView(R.layout.activity_dashboard)
+        } catch (e: Exception) {
+            CrashLog.record("panelAcilis", e)
+            try {
+                Toast.makeText(this, "Panel açılamadı.", Toast.LENGTH_SHORT).show()
+            } catch (_: Exception) {}
+            finish()
+            return
+        }
 
         val statsText: TextView = findViewById(R.id.statsText)
         val usersList: ListView = findViewById(R.id.usersList)
@@ -37,25 +46,29 @@ class DashboardActivity : AppCompatActivity() {
             val qc = try { db.questionCount() } catch (_: Exception) { 0 }
             val fmt = SimpleDateFormat("d MMM HH:mm", Locale("tr"))
             runOnUiThread {
-                statsText.text = "Kullanıcı: $uc • Sorulan soru: $qc"
-                usersList.adapter = ArrayAdapter(
-                    this, android.R.layout.simple_list_item_2, android.R.id.text1,
-                    users.map { "${it.name} (${it.email})\n${it.questionCount} soru • ${fmt.format(Date(it.createdAt))}" }
-                )
-                val allQ = questions
-                fun showQs(list: List<DbHelper.Question>) {
-                    questionsList.adapter = ArrayAdapter(
+                try {
+                    statsText.text = "Kullanıcı: $uc • Sorulan soru: $qc"
+                    usersList.adapter = ArrayAdapter(
                         this, android.R.layout.simple_list_item_2, android.R.id.text1,
-                        list.map { "${it.email}\n\"${it.text.take(120)}\" • ${fmt.format(Date(it.createdAt))}" }
+                        users.map { "${it.name} (${it.email})\n${it.questionCount} soru • ${fmt.format(Date(it.createdAt))}" }
                     )
+                    val allQ = questions
+                    fun showQs(list: List<DbHelper.Question>) {
+                        questionsList.adapter = ArrayAdapter(
+                            this, android.R.layout.simple_list_item_2, android.R.id.text1,
+                            list.map { "${it.email}\n\"${it.text.take(120)}\" • ${fmt.format(Date(it.createdAt))}" }
+                        )
+                    }
+                    showQs(allQ)
+                    usersList.setOnItemClickListener { _, _, pos, _ ->
+                        val mail = users[pos].email
+                        showQs(allQ.filter { it.email == mail })
+                        Toast.makeText(this, "$mail soruları süzüldü", Toast.LENGTH_SHORT).show()
+                    }
+                    questionsList.setOnItemClickListener { _, _, _, _ -> showQs(allQ) }
+                } catch (e: Exception) {
+                    CrashLog.record("panelVeri", e)
                 }
-                showQs(allQ)
-                usersList.setOnItemClickListener { _, _, pos, _ ->
-                    val mail = users[pos].email
-                    showQs(allQ.filter { it.email == mail })
-                    Toast.makeText(this, "$mail soruları süzüldü", Toast.LENGTH_SHORT).show()
-                }
-                questionsList.setOnItemClickListener { _, _, _, _ -> showQs(allQ) }
             }
         }.start()
     }

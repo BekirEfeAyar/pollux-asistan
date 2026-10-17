@@ -114,6 +114,10 @@ class MainActivity : AppCompatActivity() {
         }
         setContentView(R.layout.activity_main)
 
+        try {
+            CrashLog.maybeShow(this)
+        } catch (_: Exception) {}
+
         email = Prefs.sessionEmail(this) ?: ""
         db = DbHelper(this)
         brain = ChatBrain(
@@ -230,8 +234,16 @@ class MainActivity : AppCompatActivity() {
         sheetBackdrop.setOnClickListener { closeSheet() }
         findViewById<Button>(R.id.sheetDone).setOnClickListener { closeSheet() }
         findViewById<TextView>(R.id.logoutBtn).setOnClickListener {
-            Prefs.logout(this)
-            startActivity(Intent(this, LoginActivity::class.java))
+            try {
+                Prefs.logout(this)
+            } catch (e: Exception) {
+                CrashLog.record("cikis", e)
+            }
+            try {
+                startActivity(Intent(this, LoginActivity::class.java))
+            } catch (e: Exception) {
+                CrashLog.record("cikisGecis", e)
+            }
             finish()
         }
         findViewById<Button>(R.id.photoPick).setOnClickListener {
@@ -655,8 +667,8 @@ class MainActivity : AppCompatActivity() {
     private fun showHome() {
         currentId = null
         Thread {
-            try {
-                content.post {
+            content.post {
+                try {
                     content.removeAllViews()
                     content.addView(introBox)
                     introBox.visibility = View.VISIBLE
@@ -678,8 +690,10 @@ class MainActivity : AppCompatActivity() {
                     input.setText("")
                     updateSend()
                     renderHist()
+                } catch (e: Exception) {
+                    CrashLog.record("anaEkran", e)
                 }
-            } catch (_: Exception) {}
+            }
         }.start()
     }
 
@@ -838,13 +852,17 @@ class MainActivity : AppCompatActivity() {
             try { db.addMessage(cid, "user", t) } catch (_: Exception) {}
         }.start()
         runOnUiThread {
-            if (introBox.parent != null && introBox.visibility == View.VISIBLE) {
-                hideIntro()
+            try {
+                if (introBox.parent != null && introBox.visibility == View.VISIBLE) {
+                    hideIntro()
+                }
+                addUserView(t)
+                showTyping()
+                input.setText("")
+                updateSend()
+            } catch (e: Exception) {
+                CrashLog.record("soruEkrani", e)
             }
-            addUserView(t)
-            showTyping()
-            input.setText("")
-            updateSend()
         }
         val t0 = System.currentTimeMillis()
         brain.answer(t, true) { ans ->
@@ -860,16 +878,21 @@ class MainActivity : AppCompatActivity() {
                     } catch (_: Exception) {}
                 }.start()
                 runOnUiThread {
-                    hideTyping()
-                    if (ans.card != null) {
-                        addAssistantView(ans.text, null)
-                        addCardView(ans.card.title, ans.card.sub)
-                    } else {
-                        addAssistantView(ans.text, ans.source ?: "Bilgi bankası · çevrimdışı")
+                    try {
+                        hideTyping()
+                        if (ans.card != null) {
+                            addAssistantView(ans.text, null)
+                            addCardView(ans.card.title, ans.card.sub)
+                        } else {
+                            addAssistantView(ans.text, ans.source ?: "Bilgi bankası · çevrimdışı")
+                        }
+                        ans.action?.let { runAction(it) }
+                        busy = false
+                        renderHist()
+                    } catch (e: Exception) {
+                        CrashLog.record("cevap", e)
+                        busy = false
                     }
-                    ans.action?.let { runAction(it) }
-                    busy = false
-                    renderHist()
                 }
             }
             if (wait > 0) {

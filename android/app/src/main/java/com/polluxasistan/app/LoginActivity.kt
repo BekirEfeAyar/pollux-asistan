@@ -26,6 +26,10 @@ class LoginActivity : AppCompatActivity() {
         }
         setContentView(R.layout.activity_login)
 
+        try {
+            CrashLog.maybeShow(this)
+        } catch (_: Exception) {}
+
         // Giris animasyonu: logo + baslik yumusak belirir
         try {
             val avatar: android.view.View = findViewById(R.id.loginAvatar)

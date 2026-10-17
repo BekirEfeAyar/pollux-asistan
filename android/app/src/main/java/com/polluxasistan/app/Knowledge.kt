@@ -24,23 +24,60 @@ class Knowledge(private val ctx: Context) {
 
     data class Entry(val keys: List<String>, val answer: String)
 
-    private val entries: List<Entry> by lazy { load() }
+    @Volatile
+    private var cache: List<Entry>? = null
+
+    private val entries: List<Entry>
+        get() = cache ?: synchronized(this) {
+            cache ?: load().also { cache = it }
+        }
+
+    /** Yeniden yukle: indirme sonrasi yeni set hemen devreye girsin. */
+    fun reset() {
+        synchronized(this) {
+            cache = null
+        }
+    }
+
+    private fun parse(json: String): List<Entry> {
+        val arr = JSONObject(json).getJSONArray("entries")
+        return List(arr.length()) { i ->
+            val o = arr.getJSONObject(i)
+            val ka = o.getJSONArray("k")
+            val keys = List(ka.length()) { j -> ka.getString(j) }
+            Entry(keys, o.getString("a"))
+        }
+    }
 
     private fun load(): List<Entry> {
-        return try {
-            // Once indirilen tam set, yoksa paketteki 100K set
-            val full = File(ctx.filesDir, "knowledge.json")
-            val json = if (full.exists() && full.length() > 1000000) {
-                full.bufferedReader().use { it.readText() }
+        // Once indirilen mobil set; bozuk/eksikse sil ve paketteki 100K sete don
+        val full = File(ctx.filesDir, DOWNLOADED_JSON)
+        if (full.exists() && full.length() > 1_000_000) {
+            if (full.length() > 50_000_000) {
+                // Eski (telefona uygun olmayan ~1GB) surumden kalan dosya: sil
+                try {
+                    full.delete()
+                } catch (_: Exception) {}
             } else {
-                ctx.assets.open("knowledge.json").bufferedReader().use { it.readText() }
+                var oom = false
+                val fromFile = try {
+                    parse(full.bufferedReader().use { it.readText() })
+                } catch (t: Throwable) {
+                    oom = t is OutOfMemoryError
+                    null
+                }
+                if (fromFile != null && fromFile.isNotEmpty()) return fromFile
+                // Bellek yetmediyse dosyayi silme (tekrar indirmek cozum olmaz);
+                // bozuksa sil ki yeniden indirilebilsin.
+                if (!oom) {
+                    try {
+                        full.delete()
+                    } catch (_: Exception) {}
+                }
             }
-            val arr = JSONObject(json).getJSONArray("entries")
-            List(arr.length()) { i ->
-                val o = arr.getJSONObject(i)
-                val keys = List(o.getJSONArray("k").length()) { j -> o.getJSONArray("k").getString(j) }
-                Entry(keys, o.getString("a"))
-            }
+        }
+        return try {
+            parse(ctx.assets.open("knowledge.json").bufferedReader().use { it.readText() })
         } catch (_: Exception) {
             emptyList()
         }
@@ -54,63 +91,170 @@ class Knowledge(private val ctx: Context) {
     }
 
     /**
-     * Tam veri seti (10M kayit) indirilebilir. Acilista 100K kayitla baslar,
-     * kullanici indirse 1GB gzip dosyasi cikarilir.
+     * Telefon icin genisletilmis seti indirir (yaklasik 250 bin kayit).
+     * Kaldigi yerden devam edebilir: yarim kalan .gz durur, sonraki
+     * denemede Range ile o noktadan surer.
+     * Akis: indir -> dogrulanmis gzip acma -> atomik kurma.
      */
     fun downloadFullDataset(onProgress: (Int, String) -> Unit, onDone: (Boolean, String) -> Unit) {
+        if (downloading) {
+            onDone(false, "İndirme zaten sürüyor")
+            return
+        }
+        downloading = true
         Thread {
             try {
-                val url = URL("https://github.com/BekirEfeAyar/pollux-asistan/releases/download/v2.0.23-data/knowledge.json.gz")
-                val conn = (url.openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 30000
-                    readTimeout = 300000
-                    requestMethod = "GET"
-                    setRequestProperty("User-Agent", "PolluxAsistan/1.0")
-                    instanceFollowRedirects = true
+                cleanupLegacy()
+                val gz = File(ctx.filesDir, DOWNLOADED_GZ)
+                var startAt = if (gz.exists()) gz.length() else 0L
+
+                var conn = openConn(startAt)
+                var code = conn.responseCode
+                if (code == 200 && startAt > 0) {
+                    // Sunucu Range'i yok saydi: bastan indir
+                    gz.delete()
+                    startAt = 0L
+                    conn.disconnect()
+                    conn = openConn(0L)
+                    code = conn.responseCode
                 }
-                conn.connect()
-                val code = conn.responseCode
-                if (code !in 200..299) {
-                    val msg = "Sunucu hatası: HTTP $code"
-                    Handler(Looper.getMainLooper()).post { onDone(false, msg) }
+                if (code == 416 && startAt > 0) {
+                    // Parca gecersiz/tam: bastan indir
+                    gz.delete()
+                    startAt = 0L
+                    conn.disconnect()
+                    conn = openConn(0L)
+                    code = conn.responseCode
+                }
+                if (code != 200 && code != 206) {
+                    postDone(onDone, false, "Sunucu hatası: HTTP $code")
                     return@Thread
                 }
-                val total = conn.contentLength
-                val tmpFile = File(ctx.filesDir, "knowledge.json.gz")
-                val out = FileOutputStream(tmpFile)
-                var downloaded = 0
-                conn.inputStream.use { input ->
-                    val buf = ByteArray(8192)
-                    var read: Int
-                    while (input.read(buf).also { read = it } != -1) {
-                        out.write(buf, 0, read)
-                        downloaded += read
-                        if (total > 0) {
-                            val pct = (downloaded * 100 / total).toInt()
-                            Handler(Looper.getMainLooper()).post { onProgress(pct, "İndiriliyor... %$pct") }
+                val chunkLen = conn.contentLength.toLong()
+                val total = if (code == 206) startAt + chunkLen else chunkLen
+
+                FileOutputStream(gz, startAt > 0).use { out ->
+                    conn.inputStream.use { input ->
+                        val buf = ByteArray(65536)
+                        var done = startAt
+                        var lastPct = -1
+                        while (true) {
+                            val read = input.read(buf)
+                            if (read <= 0) break
+                            out.write(buf, 0, read)
+                            done += read
+                            if (total > 0) {
+                                val pct = ((done * 100L) / total).toInt().coerceIn(0, 100)
+                                if (pct != lastPct) {
+                                    lastPct = pct
+                                    postProgress(onProgress, pct, "İndiriliyor... %$pct")
+                                }
+                            }
                         }
                     }
                 }
-                out.close()
-                // Gzip cikar
-                Handler(Looper.getMainLooper()).post { onProgress(100, "Açılıyor...") }
-                val jsonFile = File(ctx.filesDir, "knowledge.json")
-                GZIPInputStream(tmpFile.inputStream()).use { gz ->
-                    FileOutputStream(jsonFile).use { fo ->
-                        gz.copyTo(fo)
+
+                val fileLen = gz.length()
+                if (total > 0 && fileLen < total) {
+                    val pct = (fileLen * 100 / total).toInt()
+                    postDone(onDone, false, "Bağlantı kesildi (%$pct) — kaldığı yerden devam edecek")
+                    return@Thread
+                }
+
+                postProgress(onProgress, 100, "Açılıyor...")
+
+                val tmp = File(ctx.filesDir, "knowledge.json.tmp")
+                try {
+                    GZIPInputStream(gz.inputStream()).use { gzIn ->
+                        FileOutputStream(tmp).use { out -> gzIn.copyTo(out, 65536) }
+                    }
+                } catch (_: Exception) {
+                    tmp.delete()
+                    gz.delete()
+                    postDone(onDone, false, "İnen dosya bozuk çıktı, baştan denenecek")
+                    return@Thread
+                }
+
+                val good = tmp.length() > 1_000_000 && try {
+                    val head = ByteArray(1)
+                    tmp.inputStream().use { it.read(head) }
+                    head[0] == '{'.code.toByte()
+                } catch (_: Exception) {
+                    false
+                }
+                if (!good) {
+                    tmp.delete()
+                    gz.delete()
+                    postDone(onDone, false, "Doğrulama başarısız")
+                    return@Thread
+                }
+
+                val json = File(ctx.filesDir, DOWNLOADED_JSON)
+                try {
+                    json.delete()
+                } catch (_: Exception) {}
+                if (!tmp.renameTo(json)) {
+                    try {
+                        tmp.inputStream().use { i -> json.outputStream().use { o -> i.copyTo(o, 65536) } }
+                        tmp.delete()
+                    } catch (e: Exception) {
+                        postDone(onDone, false, "Kurulamadı: ${e.message ?: "hata"}")
+                        return@Thread
                     }
                 }
-                tmpFile.delete()
-                Handler(Looper.getMainLooper()).post { onDone(true, "") }
+                gz.delete()
+                reset()
+                postDone(onDone, true, "")
             } catch (e: Exception) {
-                Handler(Looper.getMainLooper()).post { onDone(false, e.message ?: "Bilinmeyen hata") }
+                postDone(onDone, false, e.message ?: "Bilinmeyen hata")
+            } finally {
+                downloading = false
             }
         }.start()
     }
 
-    /** Tam veri seti yuklu mu? */
+    /** Eski surumden kalan artık dosyalari temizle (yeni adlari bozmaz). */
+    fun cleanupLegacy() {
+        try {
+            val old = File(ctx.filesDir, "knowledge.json.gz")
+            if (old.exists()) old.delete()
+        } catch (_: Exception) {}
+        if (downloading) return
+        try {
+            val staleTmp = File(ctx.filesDir, "knowledge.json.tmp")
+            if (staleTmp.exists()) staleTmp.delete()
+        } catch (_: Exception) {}
+    }
+
+    private fun openConn(startAt: Long): HttpURLConnection {
+        val conn = (URL(DATA_URL).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 30000
+            readTimeout = 300000
+            requestMethod = "GET"
+            setRequestProperty("User-Agent", "PolluxAsistan/1.1")
+            instanceFollowRedirects = true
+        }
+        if (startAt > 0) conn.setRequestProperty("Range", "bytes=$startAt-")
+        conn.connect()
+        return conn
+    }
+
+    private fun postProgress(cb: (Int, String) -> Unit, pct: Int, msg: String) {
+        try {
+            Handler(Looper.getMainLooper()).post { cb(pct, msg) }
+        } catch (_: Exception) {}
+    }
+
+    private fun postDone(cb: (Boolean, String) -> Unit, ok: Boolean, err: String) {
+        try {
+            Handler(Looper.getMainLooper()).post { cb(ok, err) }
+        } catch (_: Exception) {}
+    }
+
+    /** Indirilen genisletilmis set yuklu mu? */
     fun hasFullDataset(): Boolean {
-        return File(ctx.filesDir, "knowledge.json").exists()
+        val f = File(ctx.filesDir, DOWNLOADED_JSON)
+        return f.exists() && f.length() > 1_000_000
     }
 
     fun find(rawQuery: String, extra: List<Entry> = emptyList()): String? {
@@ -380,6 +524,16 @@ class Knowledge(private val ctx: Context) {
     }
 
     companion object {
+        /** Telefona uygun genisletilmis set (yaklasik 250 bin kayit, ~3 MB indirme). */
+        const val DATA_URL =
+            "https://github.com/BekirEfeAyar/pollux-asistan/releases/download/v2.0.23-data/knowledge-mobile.json.gz"
+        private const val DOWNLOADED_JSON = "knowledge.json"
+        private const val DOWNLOADED_GZ = "knowledge-mobile.json.gz"
+
+        /** Tum Knowledge nesneleri arasinda paylasilan indirme kilidi. */
+        @Volatile
+        internal var downloading = false
+
         /** Fiil zarf ekleri (isim eklerinden once denenir). */
         internal val VERB_SUFFIXES = listOf("erek", "arak", "iyor", "ecek", "acak", "ken")
 

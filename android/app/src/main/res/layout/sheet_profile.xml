@@ -143,6 +143,39 @@
                 android:textColor="@color/soluk"
                 android:textSize="14sp" />
         </LinearLayout>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="6dp"
+            android:text="Bilgi bankası"
+            android:textColor="@color/soluk"
+            android:textSize="12sp" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <TextView
+                android:id="@+id/bankStatus"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Paket: 100 bin kayıt"
+                android:textColor="@color/murekkep"
+                android:textSize="14sp" />
+            <Button
+                android:id="@+id/bankBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:background="@drawable/bg_field"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="TAM SETİ İNDİR"
+                android:textAllCaps="false"
+                android:textColor="@color/murekkep"
+                android:textSize="12sp" />
+        </LinearLayout>
         <Button
             android:id="@+id/sheetDone"
             android:layout_width="match_parent"

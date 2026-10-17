@@ -74,6 +74,8 @@ class MainActivity : AppCompatActivity() {
     private var busy = false
     private var breathSet: AnimatorSet? = null
     private var pendingAction: ChatBrain.Action? = null
+    private var bankBusy = false
+    private var bankLastPct = -1
 
     private val pickPhoto = registerForActivityResult(
         ActivityResultContracts.GetContent(),
@@ -96,14 +98,11 @@ class MainActivity : AppCompatActivity() {
         Thread { Prefs.ensureSeedAccount(this) }.start()
         Thread {
             try {
-                Knowledge(applicationContext).warmup()
-            } catch (_: Exception) {}
-        }.start()
-        Thread {
-            try {
                 val k = Knowledge(applicationContext)
+                k.warmup()
+                k.cleanupLegacy()
                 if (!k.hasFullDataset()) {
-                    k.downloadFullDataset({ _, _ -> }, { _, _ -> })
+                    startBankDownload(silent = true)
                 }
             } catch (_: Exception) {}
         }.start()
@@ -270,6 +269,8 @@ class MainActivity : AppCompatActivity() {
         themeLight.setOnClickListener { setThemeMode("light") }
         themeDark.setOnClickListener { setThemeMode("dark") }
         syncThemeSeg()
+        findViewById<Button>(R.id.bankBtn).setOnClickListener { startBankDownload(silent = false) }
+        refreshBankRow()
 
         renderHist()
         showHome()
@@ -416,12 +417,90 @@ class MainActivity : AppCompatActivity() {
         syncThemeSeg()
     }
 
+    // ---------- Bilgi bankası (indirme) ----------
+
+    private fun startBankDownload(silent: Boolean) {
+        if (bankBusy || Knowledge.downloading) return
+        bankBusy = true
+        bankLastPct = -1
+        refreshBankRow()
+        try {
+            Knowledge(applicationContext).downloadFullDataset(
+                { pct, _ ->
+                    runOnUiThread {
+                        bankLastPct = pct
+                        refreshBankRow()
+                    }
+                },
+                { ok, err ->
+                    runOnUiThread {
+                        bankBusy = false
+                        bankLastPct = -1
+                        refreshBankRow()
+                        try {
+                            brain.resetKnowledge()
+                        } catch (_: Exception) {}
+                        val msg = if (ok) "Tam veri seti hazır — artık daha çok şey biliyor" else "İndirilemedi: $err"
+                        if (ok || !silent) {
+                            try {
+                                Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+                            } catch (_: Exception) {}
+                        }
+                    }
+                }
+            )
+        } catch (e: Exception) {
+            bankBusy = false
+            bankLastPct = -1
+            refreshBankRow()
+            CrashLog.record("indirme", e)
+            if (!silent) {
+                try {
+                    Toast.makeText(this, "İndirme başlatılamadı.", Toast.LENGTH_SHORT).show()
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
+    private fun refreshBankRow() {
+        try {
+            val status: TextView? = findViewById(R.id.bankStatus)
+            val btn: Button? = findViewById(R.id.bankBtn)
+            if (status == null || btn == null) return
+            val installed = try {
+                Knowledge(applicationContext).hasFullDataset()
+            } catch (_: Exception) {
+                false
+            }
+            when {
+                bankBusy || Knowledge.downloading -> {
+                    status.text =
+                        if (bankLastPct >= 0) "Tam set indiriliyor: %$bankLastPct" else "Tam set indiriliyor..."
+                    btn.text = "İNDİRİLİYOR"
+                    btn.isEnabled = false
+                    btn.visibility = View.VISIBLE
+                }
+                installed -> {
+                    status.text = "Tam set yüklü: 250 bin+ kayıt"
+                    btn.visibility = View.GONE
+                }
+                else -> {
+                    status.text = "Paket: 100 bin kayıt"
+                    btn.text = "TAM SETİ İNDİR"
+                    btn.isEnabled = true
+                    btn.visibility = View.VISIBLE
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
     // ---------- Alt sayfa ----------
 
     private fun openSheet() {
         try {
             refreshAvatars()
             syncThemeSeg()
+            refreshBankRow()
             sheetWrap.visibility = View.VISIBLE
             sheetBackdrop.alpha = 0f
             sheetBackdrop.animate().cancel()

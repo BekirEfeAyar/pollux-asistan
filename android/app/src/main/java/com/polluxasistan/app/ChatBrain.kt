@@ -38,6 +38,13 @@ class ChatBrain(
             emptyList()
         }
     }
+
+    /** Indirme sonrasi bilgi bankasini tazele: yeni set hemen kullanilsin. */
+    fun resetKnowledge() {
+        try {
+            knowledge.reset()
+        } catch (_: Exception) {}
+    }
     sealed interface Action {
         object FlashOn : Action
         object FlashOff : Action

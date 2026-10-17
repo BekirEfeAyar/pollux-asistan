@@ -1,0 +1,7 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp" android:height="64dp"
+    android:viewportWidth="64" android:viewportHeight="64">
+    <path android:fillColor="@color/yuzey_kullanici" android:pathData="M0,0h64v64h-64z" />
+    <path android:fillColor="@color/soluk" android:pathData="M32,36a11,11 0,1 0,0.1,0z" />
+    <path android:fillColor="@color/soluk" android:pathData="M10,66c2,-15 12,-22 22,-22s20,7 22,22z" />
+</vector>

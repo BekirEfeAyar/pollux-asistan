@@ -601,6 +601,9 @@ class ChatBrain(
             )
         }
 
+        // ---- Sayı bilgileri (üreteç: kare, küp, tek/çift, basamak, rakam toplamı) ----
+        numberFacts(f)?.let { return it }
+
         // ---- Bilgi (offline, değişmeyen gerçekler) ----
         if (f.contains("turkiye") && f.contains("baskent")) return Answer("Türkiye'nin başkenti Ankara'dır.")
         if ((f.contains("turkiye") || f.contains("ulke")) && f.contains("nufus")) {
@@ -1169,6 +1172,33 @@ class ChatBrain(
             else -> "obez"
         }
         return Answer("Boy-kilo endeksin: ${fmtNum(bmi)} ($cat aralığı).")
+    }
+
+    // ---------- Sayı bilgileri (üreteç) ----------
+    // Tam setteki sayı kayıtlarını (kare, küp, tek/çift, basamak, rakam toplamı)
+    // depolamadan anında üretir; sınırsız sayı aralığında çalışır.
+    private fun numberFacts(f: String): Answer? {
+        val t = f.replace(Regex("(?<=\\d)\\.(?=\\d)"), "")
+        fun numOf(re: Regex): Long? = re.find(t)?.groupValues?.get(1)?.toLongOrNull()
+        numOf(Regex("\\b(\\d{1,15})\\b\\D{0,25}\\bkare(?:si|sini|sinin)?\\b"))?.let { n ->
+            return Answer("$n sayisinin karesi " + java.math.BigInteger.valueOf(n).pow(2).toString() + "'dir.")
+        }
+        numOf(Regex("\\b(\\d{1,15})\\b\\D{0,25}\\bkup(?:u|un|unu|unun)?\\b"))?.let { n ->
+            return Answer("$n sayisinin kupu " + java.math.BigInteger.valueOf(n).pow(3).toString() + "'dir.")
+        }
+        numOf(Regex("\\b(\\d{1,15})\\b\\D{0,30}\\bbasamak[a-z]{0,8}\\b"))?.let { n ->
+            return Answer("$n sayisi ${n.toString().length} basamaklidir.")
+        }
+        if (t.contains("toplam")) {
+            numOf(Regex("\\b(\\d{1,15})\\b\\D{0,30}\\brakam[a-z]{0,8}\\b"))?.let { n ->
+                val s = n.toString().sumOf { it - '0' }
+                return Answer("$n sayisinin rakamlari toplami $s'dir.")
+            }
+        }
+        numOf(Regex("\\b(\\d{1,15})\\b\\D{0,20}\\b(?:tek|cift)\\b"))?.let { n ->
+            return Answer(if (n % 2L == 0L) "$n cift sayidir." else "$n tek sayidir.")
+        }
+        return null
     }
 
     // ---------- Hesap makinesi ----------

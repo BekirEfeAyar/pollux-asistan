@@ -500,7 +500,7 @@ function mathAnswer(f) {
   try {
     const v = mathParse(s);
     if (!isFinite(v)) return 'Bu hesabın sonucu tanımsız (sıfıra bölme olabilir).';
-    return f.trim() + ' = ' + fmtNum(v);
+    return fmtNum(v);
   } catch (e) {
     if (e && e.message === 'zero') return f.trim() + ' tanımsız (sıfıra bölünemez).';
     return null;
@@ -711,6 +711,26 @@ function launchTarget(target) {
     return true;
   } catch (e) { return false; }
 }
+let pendingSiteOpen = null; // site onay akisi (TUI / klasik / --ac)
+function titleTr(s) {
+  return String(s).split(' ').map((w) => (w ? w[0].toLocaleUpperCase('tr') + w.slice(1) : w)).join(' ');
+}
+function siteHost(u) {
+  return String(u).replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+}
+const TR_APP_NAMES = {
+  notepad: 'Not Defteri', calc: 'Hesap Makinesi', mspaint: 'Paint', paint: 'Paint',
+  cmd: 'Komut İstemi', explorer: 'Dosya Gezgini', taskmgr: 'Görev Yöneticisi',
+  control: 'Denetim Masası', winword: 'Word', excel: 'Excel', powerpnt: 'PowerPoint',
+  chrome: 'Chrome', msedge: 'Edge', firefox: 'Firefox', code: 'Visual Studio Code',
+};
+function appTitle(name) {
+  const k = fold(String(name).toLowerCase());
+  if (TR_APP_NAMES[k]) return TR_APP_NAMES[k];
+  return titleTr(name);
+}
+const NOIDEA_TEXT = 'Bunu anlayamadım. "yardım" yazarsan neler yapabildiğimi gösteririm.';
+const OFFLINE_TEXT = '✗ İnternet yok, canlı veriyi çekemiyorum.\n  Bilgi bankasından çevrimdışı yanıt verebilirim.';
 function openApp(raw) {
   const stop = new Set(['ac', 'acar', 'misin', 'calistir', 'baslat', 'uygulamayi', 'uygulamasini', 'uygulama', 'programi', 'programini', 'program', 'lutfen', 'bana', 'bi', 'bir', 'su', 'o']);
   const clean = fold(raw.toLowerCase()).split(' ').map((t) => t.trim()).filter((t) => t && !stop.has(t)).join(' ');
@@ -1359,7 +1379,8 @@ function timeAnswer(f, tokens, now) {
   if (!((f.includes('saat') && f.includes('kac')) || f === 'saat' || f === 'saat kac')) return null;
   const wc = worldClock(f);
   if (wc) return wc;
-  return 'Saat ' + now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+  const gunler = ['pazar', 'pazartesi', 'salı', 'çarşamba', 'perşembe', 'cuma', 'cumartesi'];
+  return now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) + ' · ' + gunler[now.getDay()];
 }
 function dateAnswer(f, tokens, now) {
   if (f.includes('tarihte bugun') || f.includes('bugun tarihte ne oldu')) {
@@ -1591,8 +1612,11 @@ async function answer(raw) {
   if (tokens.includes('ac') || tokens.includes('acar') || f.includes('baslat') || f.includes('calistir')) {
     const opened = openApp(raw);
     if (opened) {
-      if (opened.kind === 'site') return opened.name + ' açılıyor: ' + opened.target;
-      return opened.name + ' açılıyor.';
+      if (opened.kind === 'site') {
+        pendingSiteOpen = opened.target;
+        return '⚠ ' + siteHost(opened.target) + ' tarayıcıda açılacak.';
+      }
+      return '✓ ' + appTitle(opened.name) + ' açıldı';
     }
     if (tokens.includes('ac') || tokens.includes('acar')) return 'Bu uygulamayı bulamadım. Tam adını yazmayı dene (örn: spotify aç). Yüklüleri görmek için: uygulamaları listele';
   }
@@ -1712,14 +1736,14 @@ async function answer(raw) {
   if (f.includes('itfaiye') && (f.includes('numara') || f.includes('ara') || f.includes('yangin'))) return "İtfaiye için 110, genel acil için 112'yi arayabilirsin.";
   if (f.includes('jandarma')) return "Jandarma için 156, genel acil için 112'yi arayabilirsin.";
   if (f.includes('hava durumu') || f.includes('hava nasil') || (f.includes('hava') && f.includes('kac derece'))) {
-    if (!(await hasInternet())) return 'Hava durumunu öğrenmem için internet gerekli. Şu an çevrimdışıyım.';
+    if (!(await hasInternet())) return OFFLINE_TEXT;
     const g0 = await guessPlace(raw);
     const w = await weatherNow(g0 || 'İstanbul');
     if (w) return w + (g0 ? '' : ' (İstanbul için gösterdim, şehir yazarsan onunkini söylerim.)');
     return 'O şehrin havasını bulamadım. Şehir adını net yazmayı dene.';
   }
   if (f.includes('dolar') || f.includes('euro') || f.includes('sterlin') || f.includes('altin fiyati') || f.includes('doviz')) {
-    if (!(await hasInternet())) return 'Güncel kurlar için internet gerekli. Şu an çevrimdışıyım.';
+    if (!(await hasInternet())) return OFFLINE_TEXT;
     const r = await tcmbRates();
     if (!r) return 'Kurlara şu an ulaşamadım. Biraz sonra tekrar dene.';
     const names = { USD: 'Dolar', EUR: 'Euro', GBP: 'Sterlin' };
@@ -1833,7 +1857,7 @@ async function answer(raw) {
   if (f.includes('gundem') || f.includes('son dakika') || f.includes('son haber') ||
     f.includes('bugun ne oldu') || f.includes('turkiyede ne oluyor') || f.includes('haberler') ||
     f.includes('haberi') || f.includes('haberin')) {
-    if (!(await hasInternet())) return 'Gündemi öğrenmem için internet gerekli. Şu an çevrimdışıyım.';
+    if (!(await hasInternet())) return OFFLINE_TEXT;
     const stopN = new Set(['gundem', 'son', 'dakika', 'haber', 'haberi', 'haberin', 'haberler', 'haberleri',
       'bugun', 'ne', 'oldu', 'oluyor', 'turkiyede', 'turkiye', 'var', 'mi', 'mu', 'olan', 'hakkindaki',
       'hakkinda', 'ile', 'ilgili', 'bana', 'ver', 'goster', 'soyle', 'neler', 'hangileri', 'acaba']);
@@ -1882,7 +1906,7 @@ async function answer(raw) {
 
   // arastirma: once arastirma motoru (detayli + kaynakli), olmazsa yapay zeka
   if (!(await hasInternet())) {
-    return 'Şu an çevrimdışıyım, o yüzden bunu araştıramadım. Ama elimden çok şey gelir: hesap yaparım, birim çeviririm, saat-tarih söylerim, uygulama açarım. İstersen farklı şekilde sormayı dene, belki kayıtlarımdadır.';
+    return OFFLINE_TEXT;
   }
   const r = await researcher(query);
   if (r) {
@@ -1925,11 +1949,7 @@ async function answer(raw) {
     const kb2 = findKnowledge(query, learned.map((e) => ({ k: [e.q], a: e.a })));
     if (kb2) return kb2 + '\n(Detaylı araştırma yapamadım, interneti kontrol et.)';
   }
-  return personaPick(
-    [C('Hmm, bunu tam çıkaramadım ya. Başka türlü anlatsana? Kısa sorarsan daha iyi yakalarım.')],
-    [C('Hmm, bunu tam çıkaramadım. Biraz daha farklı anlatır mısın? İpucu: kısa ve net sorular en iyi sonucu verir (örn: "Van kedisi nedir").')],
-    [C('Affedersiniz, anlayamadım. Farklı şekilde ifade eder misiniz?')]
-  );
+  return NOIDEA_TEXT;
 }
 
 function zodiac(day, month) {
@@ -2166,25 +2186,76 @@ function openUrl(url) {
   } catch (e) { return false; }
 }
 
-// ---------- TUI (fotograftaki tasarim) ----------
-// Kullanim: pollux --tui
-// Fareyle "My Links"e tiklanir (Windows Terminal destekler), klavyeden /link de acar.
+// ---------- TUI (tasarim: "Pollux CMD Gorsel Referans" - kullanicinin tasarimi) ----------
+// Kullanim: pollux            ekran uygulamasi (varsayilan)
+//           /tema acik|koyu   tema degistirir
+// Fare: baglantilara ve My Links ogelerine tiklanir; tekerlek kaydirir.
 const LINKS_URL = MY_LINKS;
-// Nokta-matris logo (fotograf: yogun nokta + hafif golge)
-const LOGO_RAW = [
-  '#####  ###  #      #      #   # #   #',
-  '#   # #   # #      #      #   # #   #',
-  '#   # #   # #      #      #   #  # # ',
-  '##### #   # #      #      #   #   #  ',
-  '#     #   # #      #      #   #  # # ',
-  '#     #   # #      #      #   # #   #',
-  '#      ###  #####  #####   ###  #   #',
+const MYLINK_ITEMS = [
+  { label: 'instagram', url: 'https://www.instagram.com/efebekir_slm/' },
+  { label: 'github', url: 'https://github.com/BekirEfeAyar' },
+  { label: 'e-devlet', url: 'https://www.turkiye.gov.tr/' },
+  { label: 'mail', url: 'mailto:bekirefeayar101@gmail.com' },
 ];
+// Palet (tasarim sayfa 7): koyu + acik tema; 256 karsiliklari otomatik hesaplanir
+const TUI_THEMES = {
+  koyu: {
+    bg: '#1c1a17', text: '#e8e2d6', dim: '#8a8478', accent: '#d98e4a', green: '#9bb08f', yellow: '#d9b54a', red: '#c4604f', rule: '#3a352e',
+    x256: { bg: 234, text: 253, dim: 245, accent: 173, green: 108, yellow: 179, red: 167, rule: 236 },
+  },
+  acik: {
+    bg: '#f4efe6', text: '#2b2722', dim: '#857d6f', accent: '#b5651d', green: '#5f7a52', yellow: '#9a7a14', red: '#a8452f', rule: '#d9d0c0',
+    x256: { bg: 230, text: 235, dim: 244, accent: 130, green: 65, yellow: 100, red: 131, rule: 252 },
+  },
+};
+function tuiTruecolor() {
+  if (/truecolor|24bit/i.test(process.env.COLORTERM || '')) return true;
+  if (process.env.WT_SESSION) return true; // Windows Terminal
+  return /vscode|Windows_Terminal|Hyper|iTerm/i.test(process.env.TERM_PROGRAM || '');
+}
+function tuiXterm256(hex) {
+  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+  const lv = [0, 95, 135, 175, 215, 255];
+  const near = (v) => { let bi = 0, bd = 1e9; for (let i = 0; i < lv.length; i++) { const d = Math.abs(lv[i] - v); if (d < bd) { bd = d; bi = i; } } return bi; };
+  const ri = near(r), gi = near(g), bi = near(b);
+  const dCube = (r - lv[ri]) * (r - lv[ri]) + (g - lv[gi]) * (g - lv[gi]) + (b - lv[bi]) * (b - lv[bi]);
+  const avg = Math.round((r + g + b) / 3);
+  let gv = 8 + Math.round((avg - 8) / 10) * 10; gv = Math.max(8, Math.min(238, gv));
+  const dGray = (r - gv) * (r - gv) + (g - gv) * (g - gv) + (b - gv) * (b - gv);
+  if (dGray < dCube) return 232 + Math.round((gv - 8) / 10);
+  return 16 + 36 * ri + 6 * gi + bi;
+}
+function tuiColorCodes(name) {
+  const th = TUI_THEMES[name] || TUI_THEMES.koyu;
+  const tc = tuiTruecolor();
+  const rgb = (hex) => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+  const fgKey = (key) => {
+    if (tc) { const c = rgb(th[key]); return '\x1b[38;2;' + c[0] + ';' + c[1] + ';' + c[2] + 'm'; }
+    const n = th.x256 && th.x256[key] !== undefined ? th.x256[key] : tuiXterm256(th[key]);
+    return '\x1b[38;5;' + n + 'm';
+  };
+  const bgKey = (key) => {
+    if (tc) { const c = rgb(th[key]); return '\x1b[48;2;' + c[0] + ';' + c[1] + ';' + c[2] + 'm'; }
+    const n = th.x256 && th.x256[key] !== undefined ? th.x256[key] : tuiXterm256(th[key]);
+    return '\x1b[48;5;' + n + 'm';
+  };
+  return {
+    c: {
+      text: fgKey('text'), dim: fgKey('dim'), accent: fgKey('accent'), green: fgKey('green'),
+      yellow: fgKey('yellow'), red: fgKey('red'), rule: fgKey('rule'),
+      bg: fgKey('bg'), accentBg: bgKey('accent'),
+    },
+    bgEsc: bgKey('bg'),
+    bold: '\x1b[1m',
+    nob: '\x1b[22m\x1b[23m\x1b[24m',
+    resetAll: '\x1b[0m',
+  };
+}
 const TERM = { w: process.stdout.columns || 80, h: process.stdout.rows || 24 };
 function tuiSize() {
   return {
     w: Math.max(40, TERM.w || process.stdout.columns || 80),
-    h: Math.max(20, TERM.h || process.stdout.rows || 24),
+    h: Math.max(16, TERM.h || process.stdout.rows || 24),
   };
 }
 function tuiWrap(text, width) {
@@ -2204,170 +2275,544 @@ function tuiWrap(text, width) {
   }
   return out;
 }
+function tuiHostOf(u) {
+  try {
+    return String(u).replace(/^mailto:/, '').replace(/^https?:\/\//, '').replace(/^www\./, '').split(/[/?]/)[0];
+  } catch (e) { return String(u); }
+}
+// Klasik mod + tek soru icin: ✓ ⚠ ✗ isaretlerini renklendirir (yalnizca TTY)
+function colorizePlain(text) {
+  if (!process.stdout.isTTY) return text;
+  const W2 = '\x1b[38;5;179m', G2 = '\x1b[38;5;108m', R2 = '\x1b[38;5;167m', D2 = '\x1b[2m', Z = '\x1b[0m';
+  return String(text).split('\n').map((ln) => {
+    let s = ln;
+    if (s.startsWith('✓')) s = G2 + '✓' + Z + s.slice(1);
+    else if (s.startsWith('⚠')) s = W2 + '⚠' + Z + s.slice(1);
+    else if (s.startsWith('✗')) {
+      const i = s.indexOf('. ');
+      if (i > 0) s = R2 + '✗' + Z + s.slice(1, i + 2) + D2 + s.slice(i + 2) + Z;
+      else s = R2 + '✗' + Z + s.slice(1);
+    }
+    s = s.replace(/\[e\/h\]/g, D2 + '[e/h]' + Z);
+    return s;
+  }).join('\n');
+}
+const TUI_HELP_CMDS = [
+  ['saat kaç', 'saati söyler'], ['2+2 · 5*8', 'hesaplar'], ['100 dolar kaç tl', 'canlı kur'],
+  ['hava <şehir>', 'hava durumu'], ['<uygulama> aç', 'uygulama açar'], ['<site> aç', 'site açar (uyarıyla)'],
+  ['<kelime> ne demek', 'sözlük'], ['<konu> araştır', 'yapay zeka araştırması'], ['<soru>', 'bilgi bankasında ara'],
+];
+const TUI_HELP_KEYS = [
+  ['↑ ↓', 'geçmiş'], ['Tab', 'tamamla'], ['Ctrl+L', 'temizle'], ['Esc', 'panel kapat'], ['Ctrl+C', 'çıkış'], ['1-4', 'My Links aç'],
+];
+const TUI_HELP_MODS = [
+  ['pollux', 'ekran uygulaması'], ['pollux --chat', 'klasik satır sohbeti'], ['pollux "saat kaç"', 'tek soru, tek cevap'],
+];
+const TUI_FOOT = '↑ ↓ geçmiş    Tab tamamla    Ctrl+L temizle    Esc kapat    Ctrl+C çıkış';
+const TUI_FOOT_HELP = 'Esc ile yardım kapanır    sohbete dönmek için herhangi bir tuş';
+const TUI_SPIN = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏';
+
 async function tuiLoop() {
   const stdin = process.stdin, stdout = process.stdout;
-  const { w, h } = tuiSize();
-  const state = {
-    input: '', cursor: 0,
-    tabs: [], active: 0, tabN: 0,
-    status: "My Links'e tıkla / F1 / /link • PgUp/PgDn: kaydır • çıkış: /cikis",
-    statusUntil: 0, busy: false,
-    linkRow: 0, linkCol: 0, dots: 0, renaming: false,
+  const PAD = 0;
+  const MAXLINES = 160;
+  const S = {
+    input: '', cursor: 0, lines: [], ctx: { lastTopic: '', lastTitle: '', lastContext: '' },
+    offset: 0, busy: false, busyStart: 0, spin: 0,
+    theme: 'koyu', C: null,
+    online: null, confirmUrl: null, confirmName: '',
+    pendingUrls: [], history: [], histIdx: -1, histDraft: '',
+    cursorOn: true, blink: 0, flashMsg: '', flashUntil: 0,
+    urlRegions: [], linkRegions: [], inputGeom: null,
+    compIdx: -1, compList: [],
+    panel: false, helpBase: 0, inSplash: false, plain: false,
   };
-  const cur = () => state.tabs[state.active];
-  function newTabObj(name) {
-    return { name, lines: [], offset: 0, pendingUrls: [], ctx: { lastTopic: '', lastTitle: '', lastContext: '' } };
-  }
-  function saveCtx(t) {
-    try { t.ctx = { lastTopic, lastTitle, lastContext }; } catch (e) {}
-  }
-  function loadCtx(t) {
+  let needClear = true;
+  let sizeTimer = null;
+  let onlineTimer = null;
+
+  function loadState() {
     try {
-      const c = (t && t.ctx) || {};
+      const d = JSON.parse(fs.readFileSync(CHATS_FILE, 'utf8'));
+      if (d && typeof d.theme === 'string' && TUI_THEMES[d.theme]) S.theme = d.theme;
+      if (d && Array.isArray(d.tabs) && d.tabs.length) {
+        const t = d.tabs[Math.max(0, Math.min(d.active || 0, d.tabs.length - 1))];
+        if (t) {
+          S.lines = (Array.isArray(t.lines) ? t.lines : [])
+            .filter((m) => m && typeof m.para === 'string' && (m.who === 'u' || m.who === 'a'))
+            .slice(-MAXLINES);
+          S.ctx = t.ctx || S.ctx;
+        }
+      }
+    } catch (e) {}
+    S.history = S.lines.filter((m) => m.who === 'u').map((m) => m.para).slice(-50);
+  }
+  function saveState() {
+    try {
+      fs.writeFileSync(CHATS_FILE, JSON.stringify({
+        theme: S.theme,
+        tabs: [{ name: 'Sohbet', lines: S.lines.slice(-MAXLINES), ctx: S.ctx }],
+        active: 0, tabN: 1,
+      }), 'utf8');
+    } catch (e) {}
+  }
+  function saveCtx() {
+    try { S.ctx = { lastTopic, lastTitle, lastContext }; } catch (e) {}
+  }
+  function loadCtx() {
+    try {
+      const c = S.ctx || {};
       lastTopic = c.lastTopic || ''; lastTitle = c.lastTitle || ''; lastContext = c.lastContext || '';
     } catch (e) {}
   }
-  function saveTabs() {
-    try {
-      const data = state.tabs.map((t) => ({ name: t.name, lines: t.lines.slice(-120), ctx: t.ctx }));
-      fs.writeFileSync(CHATS_FILE, JSON.stringify({ tabs: data, active: state.active, tabN: state.tabN }), 'utf8');
-    } catch (e) {}
+  function push(text, who) {
+    for (const para of String(text).split('\n')) S.lines.push({ para, who });
+    while (S.lines.length > MAXLINES) S.lines.shift();
   }
-  function loadTabs() {
-    try {
-      const d = JSON.parse(fs.readFileSync(CHATS_FILE, 'utf8'));
-      if (d && Array.isArray(d.tabs) && d.tabs.length) {
-        state.tabs = d.tabs.slice(0, 12).map((t, i) => ({
-          name: String(t.name || ('Sohbet ' + (i + 1))).slice(0, 24),
-          lines: Array.isArray(t.lines) ? t.lines.filter((m) => m && typeof m.para === 'string').slice(-120) : [],
-          offset: 0, pendingUrls: [],
-          ctx: t.ctx || { lastTopic: '', lastTitle: '', lastContext: '' },
-        }));
-        state.active = Math.max(0, Math.min(d.active || 0, state.tabs.length - 1));
-        state.tabN = d.tabN || state.tabs.length;
-        return;
-      }
-    } catch (e) {}
-    state.tabs = [newTabObj('Sohbet 1')];
-    state.active = 0;
-    state.tabN = 1;
+  function flash(msg) {
+    S.flashMsg = msg; S.flashUntil = Date.now() + 2500;
   }
-  function tabBar(w) {
-    state.tabRegions = [];
-    let s = DIM + '▎' + RESET;
-    let x = 1;
-    state.tabs.forEach((t, i) => {
-      const label = ' ' + (t.name || ('Sohbet ' + (i + 1))).slice(0, 16) + ' ';
-      const llen = visibleLen(label);
-      const x0 = x;
-      if (i === state.active) {
-        s += GOLD + '▎' + RESET + BRIGHT + label + RESET + MRED + '×' + RESET + GOLD + '▎' + RESET;
-        x += 2 + llen + 1;
-      } else {
-        s += DIM + label + RESET + MRED + '×' + RESET + DIM + '│' + RESET;
-        x += llen + 2;
-      }
-      state.tabRegions.push({ i, x0, x1: x - 2, close: false });
-      state.tabRegions.push({ i, x0: x - 2, x1: x - 1, close: true });
-    });
-    s += ' ' + DIM + '+' + RESET;
-    const hint = 'Ctrl+T yeni • Ctrl+W kapat • Ctrl+←/→ geç • F2 ad';
-    const room = Math.max(0, w - visibleLen(s) - visibleLen(hint) - 1);
-    if (room > 0) s += ' '.repeat(room) + DIM + hint + RESET;
-    return s;
-  }
-  function openTab() {
-    if (state.tabs.length >= 12) { flash('En fazla 12 sekme'); render(); return; }
-    saveCtx(cur());
-    state.tabN++;
-    const t = newTabObj('Sohbet ' + state.tabN);
-    state.tabs.push(t);
-    state.active = state.tabs.length - 1;
-    loadCtx(t);
-    state.input = ''; state.cursor = 0;
-    saveTabs(); render();
-  }
-  function closeTab() { closeTabAt(state.active); }
-  function closeTabAt(i) {
-    if (state.tabs.length <= 1) { flash('Son sekme kapatılamaz'); render(); return; }
-    if (i < 0 || i >= state.tabs.length) return;
-    const closingActive = (i === state.active);
-    state.tabs.splice(i, 1);
-    if (closingActive) {
-      state.active = Math.min(i, state.tabs.length - 1);
-      loadCtx(cur());
-    } else if (state.active > i) {
-      state.active--;
-    }
-    saveTabs(); render();
-  }
-  function startRename() {
-    state.renaming = true;
-    state.input = ''; state.cursor = 0;
-    flash('Sekme adı yaz, Enter onayla (Esc vazgeç)');
+  function openLinks() {
+    try { openUrl(LINKS_URL); flash('Bağlantıların açılıyor...'); } catch (e) { flash('Açılamadı: ' + LINKS_URL); }
     render();
   }
-  function moveTab(d) {
-    if (state.tabs.length <= 1) return;
-    switchToTab((state.active + d + state.tabs.length) % state.tabs.length);
+  function segRow(segs) {
+    return { segs: segs, plain: segs.map((s) => s[1]).join('') };
   }
-  function switchToTab(i) {
-    if (i === state.active || i < 0 || i >= state.tabs.length) return;
-    saveCtx(cur());
-    state.active = i;
-    loadCtx(cur());
-    state.input = ''; state.cursor = 0;
-    saveTabs(); render();
+  function segCode(st) {
+    const C = S.C;
+    const base = C.nob + C.bgEsc;
+    switch (st) {
+      case '': return base + C.c.text;
+      case 'd': return base + C.c.dim;
+      case 'b': return base + C.bold + C.c.text;
+      case 'a': return base + C.c.accent;
+      case 'a!': return base + C.bold + C.c.accent;
+      case 'g': return base + C.c.green;
+      case 'w': return base + C.c.yellow;
+      case 'r': return base + C.c.red;
+      case 'rule': return base + C.c.rule;
+      case 'key': return C.nob + C.c.accentBg + C.bold + C.c.bg;
+      case 'cursor': return base + C.bold + C.c.accent;
+      default: return base + C.c.text;
+    }
   }
-  // Tiklanabilir baglanti bolgeleri (render'da hesaplanir)
-  function collectUrls(plain, row, base0) {
+  function paint(rows) {
+    const { w, h } = tuiSize();
+    const C = S.C;
+    if (S.plain) {
+      const out = [];
+      for (let r = 0; r < h; r++) {
+        const row = rows[r] || { segs: [] };
+        let line = row.segs.map((s) => s[1]).join('');
+        if (line.length < w) line += ' '.repeat(w - line.length);
+        out.push(line);
+      }
+      stdout.write(out.join('\n') + '\n');
+      return;
+    }
+    const clear = needClear;
+    needClear = false;
+    let buf = '\x1b[?25l' + (clear ? '\x1b[2J' : '');
+    for (let r = 0; r < h; r++) {
+      const row = rows[r] || { segs: [] };
+      let line = C.bgEsc;
+      let len = 0;
+      for (const s of row.segs) {
+        if (!s[1]) continue;
+        line += segCode(s[0]) + s[1];
+        len += s[1].length;
+      }
+      if (len < w) line += ' '.repeat(w - len);
+      line += C.resetAll;
+      buf += '\x1b[' + (r + 1) + ';1H' + line;
+    }
+    stdout.write(buf);
+  }
+  function userRows(para, w) {
+    const CW = Math.max(8, w - PAD * 2 - 2);
+    const parts = tuiWrap(para, CW);
+    return parts.map((p, i) => {
+      const r = segRow([['', ' '.repeat(PAD)], i ? ['', '  '] : ['a!', '❯ '], ['', p]]);
+      r.who = 'u';
+      return r;
+    });
+  }
+  function asstLineRows(ln, w) {
+    const rows = [];
+    const CW = Math.max(10, w - PAD * 2 - 5);
+    const pre = [['', ' '.repeat(PAD)], ['a', '  ┃ ']];
+    const mk = (mid) => segRow([...pre, ...mid]);
+    const t = ln;
+    if (/^\[!\]/.test(t)) {
+      const body = t.replace(/^\[!\]\s*/, '');
+      const parts = tuiWrap(body, CW - 2);
+      parts.forEach((p, i) => rows.push(mk([i ? ['w', '  '] : ['w', '⚠ '], ['', p]])));
+    } else if (t.startsWith('✓')) {
+      const body = t.replace(/^✓\s*/, '✓ ');
+      tuiWrap(body, CW).forEach((p) => rows.push(mk([['g', p]])));
+    } else if (t.startsWith('⚠')) {
+      tuiWrap(t, CW).forEach((p) => rows.push(mk([['w', p]])));
+    } else if (t.startsWith('✗')) {
+      const body = t.replace(/^✗\s*/, '');
+      const dot = body.indexOf('. ');
+      const cut = dot > 0 ? dot + 2 : (body.endsWith('.') ? body.length : -1);
+      if (cut > 0 && cut <= CW) rows.push(mk([['r', '✗ ' + body.slice(0, cut)], ['', body.slice(cut)]]));
+      else tuiWrap(t, CW).forEach((p, i) => rows.push(mk(i ? [['', p]] : [['r', p]])));
+    } else if (/^  /.test(t)) {
+      const body = t.replace(/^  /, '');
+      tuiWrap(body, CW - 2).forEach((p) => rows.push(mk([['d', '  '], ['d', p]])));
+    } else if (t.trim().startsWith('(') && /\)\s*$/.test(t.trim())) {
+      tuiWrap(t, CW).forEach((p) => rows.push(mk([['d', p]])));
+    } else if (t.trim() === 'Bağlantılar:') {
+      rows.push(mk([['d', 'Bağlantılar:']]));
+    } else if (/^[0-9][0-9.,]*$/.test(t.trim())) {
+      rows.push(mk([['b', t.trim()]]));
+    } else if (/^(https?:\/\/|www\.)\S+$/.test(t.trim())) {
+      tuiWrap(t.trim(), CW).forEach((p) => rows.push(mk([['a', p]])));
+    } else {
+      tuiWrap(t, CW).forEach((p) => rows.push(mk([['', p]])));
+    }
+    return rows;
+  }
+  function asstRows(para, w) {
+    const rows = [];
+    for (const ln of String(para).split('\n')) rows.push(...asstLineRows(ln, w));
+    return rows;
+  }
+  function msgRows(w) {
+    const rows = [];
+    let first = true;
+    for (const m of S.lines) {
+      if (m.who === 'u') {
+        if (!first) rows.push({ segs: [] });
+        first = false;
+        rows.push(...userRows(m.para, w));
+      } else {
+        rows.push(...asstRows(m.para, w));
+      }
+    }
+    return rows;
+  }
+  function helpRows(w) {
+    const rows = [];
+    const pad = (s, n) => s + ' '.repeat(Math.max(0, n - s.length));
+    rows.push(segRow([['', ' '.repeat(PAD)], ['d', pad('KOMUTLAR', 50) + 'KISAYOLLAR']]));
+    const n = Math.max(TUI_HELP_CMDS.length, TUI_HELP_KEYS.length);
+    for (let i = 0; i < n; i++) {
+      const c = TUI_HELP_CMDS[i], k = TUI_HELP_KEYS[i];
+      const segs = [['', ' '.repeat(PAD)]];
+      if (c) { segs.push(['a', pad(c[0], 22)]); segs.push(['d', pad(c[1], 24)]); }
+      else segs.push(['', ' '.repeat(46)]);
+      if (k) { segs.push(['a', pad(k[0], 10)]); segs.push(['d', k[1]]); }
+      rows.push(segRow(segs));
+    }
+    rows.push({ segs: [] });
+    rows.push(segRow([['', ' '.repeat(PAD)], ['d', 'MODLAR']]));
+    for (const m of TUI_HELP_MODS) rows.push(segRow([['', ' '.repeat(PAD)], ['a', pad(m[0], 22)], ['d', m[1]]]));
+    return rows;
+  }
+  function openingRows(w) {
+    const rows = [];
+    const ind = ' '.repeat(PAD + 3);
+    rows.push(segRow([['', ind], ['a!', '✦ ─────── ✧'], ['', '   '], ['b', 'POLLUX']]));
+    rows.push(segRow([['', ' '.repeat(PAD + 17)], ['d', 'çevrimdışı türkçe asistan · cmd']]));
+    rows.push({ segs: [] });
+    const cnt = ((typeof KNOWLEDGE_READY !== 'undefined' && KNOWLEDGE_READY && KNOWLEDGE.length) ? KNOWLEDGE.length : 0).toLocaleString('tr-TR') + ' kayıt';
+    const dt = new Date();
+    const gunler = ['pazar', 'pazartesi', 'salı', 'çarşamba', 'perşembe', 'cuma', 'cumartesi'];
+    const saat = String(dt.getHours()).padStart(2, '0') + ':' + String(dt.getMinutes()).padStart(2, '0');
+    rows.push(segRow([['', ind], ['g', '●'], ['', ' ' + (S.online ? 'çevrimiçi' : 'çevrimdışı') + '      '], ['d', cnt + '      ' + gunler[dt.getDay()] + ' · ' + saat]]));
+    rows.push({ segs: [] });
+    const items = MYLINK_ITEMS.map((it, i) => (i + 1) + ' ' + it.label);
+    const INNER = Math.max(56, 2 + items.join('    ').length + 1);
+    rows.push(segRow([['', ind], ['d', '╭─ My Links ' + '─'.repeat(Math.max(0, INNER - 11)) + '╮']]));
+    const midSegs = [['', ind], ['d', '│'], ['', '  ']];
+    let cur = PAD + 3 + 1 + 2;
+    const links = [];
+    MYLINK_ITEMS.forEach((it, i) => {
+      if (i) { midSegs.push(['', '    ']); cur += 4; }
+      const label = (i + 1) + ' ' + it.label;
+      midSegs.push(['a', String(i + 1)], ['', ' ' + it.label]);
+      links.push({ x0: cur, x1: cur + label.length, url: it.url });
+      cur += label.length;
+    });
+    midSegs.push(['', ' '.repeat(Math.max(1, INNER - (cur - (PAD + 3 + 1))))]);
+    midSegs.push(['d', '│']);
+    const midRow = segRow(midSegs);
+    midRow.links = links;
+    rows.push(midRow);
+    rows.push(segRow([['', ind], ['d', '╰' + '─'.repeat(INNER) + '╯']]));
+    rows.push({ segs: [] });
+    rows.push(segRow([['', ind], ['d', 'ipucu   "yardım" yaz · ↑ geçmiş · Tab tamamla']]));
+    return rows;
+  }
+  function busyRow() {
+    const el = Math.floor((Date.now() - (S.busyStart || Date.now())) / 1000);
+    return segRow([['', ' '.repeat(PAD)], ['a', '  ┃ '], ['a', TUI_SPIN[(S.spin || 0) % TUI_SPIN.length]], ['d', ' araştırıyor…' + (el >= 1 ? '  ' + el + 'sn' : '')]]);
+  }
+  function confirmRow() {
+    return segRow([['', ' '.repeat(PAD)], ['a', '  ┃ '], ['', '  Devam edilsin mi?   '], ['key', 'E'], ['', ' evet    '], ['d', 'H hayır']]);
+  }
+  function render() {
     try {
-      const seen = new Set();
-      for (const u of extractUrls(plain)) {
-        if (seen.has(u)) continue;
-        seen.add(u);
-        let needle = u, idx = plain.indexOf(needle);
-        if (idx < 0) {
-          needle = u.replace(/^https?:\/\//, '');
-          idx = plain.indexOf(needle);
-          if (idx < 0) {
-            needle = 'www.' + needle;
-            idx = plain.indexOf(needle);
+      const { w, h } = tuiSize();
+      const CH = Math.max(3, h - 5);
+      const rows = [];
+      const blank = () => ({ segs: [] });
+      const hasHead = S.lines.length || S.panel;
+      if (hasHead) {
+        const st = S.online ? 'çevrimiçi' : 'çevrimdışı';
+        const leftLen = 8, rightLen = 2 + st.length;
+        const room = w - PAD * 2 - leftLen - rightLen;
+        const hseg = [['', ' '.repeat(PAD)], ['a!', '✦'], ['b', ' POLLUX']];
+        if (room >= 2) hseg.push(['', ' '.repeat(room)], ['g', '●'], ['d', ' ' + st]);
+        rows.push(segRow(hseg));
+        rows.push(segRow([['', ' '.repeat(PAD)], ['rule', '─'.repeat(Math.max(0, w - PAD * 2))]]));
+      } else {
+        rows.push(blank());
+        rows.push(blank());
+      }
+      let content;
+      if (S.panel) {
+        content = [];
+        const lastU = [...S.lines].reverse().find((m) => m.who === 'u');
+        if (lastU) content.push(...userRows(lastU.para, w));
+        content.push(blank());
+        content.push(...helpRows(w));
+      } else if (!S.lines.length) {
+        content = openingRows(w);
+      } else {
+        content = msgRows(w);
+        if (S.confirmUrl) content.push(confirmRow());
+        if (S.busy) content.push(busyRow());
+      }
+      const maxOff = Math.max(0, content.length - CH);
+      S.offset = Math.max(0, Math.min(S.offset || 0, maxOff));
+      let start;
+      if (!S.lines.length && !S.panel) start = 0;
+      else start = Math.max(0, content.length - CH - S.offset);
+      const view = content.slice(start, start + CH);
+      while (view.length < CH) view.push(blank());
+      for (let i = 0; i < view.length; i++) view[i].screenRow = 3 + i;
+      rows.push(...view);
+      // giris satiri
+      const avail = Math.max(4, w - PAD * 2 - 2);
+      const shown = S.input.length > avail ? S.input.slice(S.input.length - avail) : S.input;
+      const win = S.input.length - shown.length;
+      const cursorInShown = Math.max(0, Math.min(shown.length, S.cursor - win));
+      const pseg = [['', ' '.repeat(PAD)], ['a!', '❯ ']];
+      pseg.push(['', shown.slice(0, cursorInShown)]);
+      if (S.cursorOn) pseg.push(['cursor', '█']);
+      pseg.push(['', shown.slice(cursorInShown)]);
+      rows.push(segRow(pseg));
+      S.inputGeom = { row: h - 2, x0: PAD + 2, len: shown.length, win: win };
+      // alt bilgi
+      rows.push(segRow([['', ' '.repeat(PAD)], ['rule', '─'.repeat(Math.max(0, w - PAD * 2))]]));
+      const flashOn = S.flashUntil && Date.now() < S.flashUntil;
+      const foot = S.panel ? TUI_FOOT_HELP : (flashOn ? S.flashMsg : TUI_FOOT);
+      rows.push(segRow([['', ' '.repeat(PAD)], [flashOn && !S.panel ? 'a' : 'd', foot]]));
+      // tiklanabilir bolgeler
+      S.urlRegions = []; S.linkRegions = [];
+      for (const r of rows) {
+        if (!r || !r.screenRow) continue;
+        if (r.plain) {
+          for (const u of extractUrls(r.plain)) {
+            let needle = u, idx = r.plain.indexOf(u);
+            if (idx < 0) { needle = u.replace(/^https?:\/\//, ''); idx = r.plain.indexOf(needle); }
+            if (idx < 0) { needle = 'www.' + u.replace(/^https?:\/\/(www\.)?/, ''); idx = r.plain.indexOf(needle); }
+            if (idx >= 0) S.urlRegions.push({ url: u, row: r.screenRow, x0: idx, x1: idx + needle.length });
           }
         }
-        while (idx >= 0) {
-          state.urlRegions.push({ url: u, row, x0: base0 + idx, x1: base0 + idx + needle.length });
-          idx = plain.indexOf(needle, idx + 1);
-        }
+        if (r.links) for (const L of r.links) S.linkRegions.push({ url: L.url, row: r.screenRow, x0: L.x0, x1: L.x1 });
       }
+      paint(rows);
     } catch (e) {}
   }
-  const DIM = '\x1b[2m', BRIGHT = '\x1b[1m', RESET = '\x1b[0m';
-  const AGRAY = '\x1b[38;5;250m', GREEN = '\x1b[92m', MRED = '\x1b[31m';
-  const GRAY = '\x1b[90m', GOLD = '\x1b[33m', BOXBG = '\x1b[48;5;236m';
-
-  function logoLines() {
-    // Golge once (gri, 1 saga + 1 asagi), sonra noktalar (beyaz)
-    const rows = LOGO_RAW.map((r) => r.split(''));
-    const W = rows[0].length, H = rows.length;
-    const out = [];
-    for (let y = 0; y <= H; y++) {
-      let line = '';
-      for (let x = 0; x <= W; x++) {
-        const main = y < H && x < W && rows[y][x] === '#';
-        const sh = y > 0 && y - 1 < H && x > 0 && x - 1 < W && rows[y - 1][x - 1] === '#';
-        if (main) line += BRIGHT + '░' + RESET;
-        else if (sh) line += GRAY + '░' + RESET;
-        else line += ' ';
-      }
-      out.push(line.replace(/\s+$/, ''));
-    }
-    return out;
+  function closePanel() {
+    if (!S.panel) return;
+    S.panel = false;
+    if (S.lines.length > S.helpBase) S.lines.length = S.helpBase;
+    render();
   }
-
-  // Terminal boyutu: acilista yetkili kaynaktan (conhost: konsol penceresi,
-  // WT: stdout), pencere sonradan degisirse resize event + stdout yakalar.
-  // NOT: powershell spawn cmd.exe'de pencere actirir, bu yuzden sadece 1 kez calisir.
+  function showHelp(t) {
+    S.helpBase = S.lines.length;
+    push(t, 'u');
+    S.panel = true;
+    S.offset = 999999;
+    render();
+  }
+  function histMove(d) {
+    if (!S.history.length) return;
+    if (d < 0) {
+      if (S.histIdx === -1) { S.histDraft = S.input; S.histIdx = S.history.length - 1; }
+      else S.histIdx = Math.max(0, S.histIdx - 1);
+      S.input = S.history[S.histIdx];
+    } else {
+      if (S.histIdx === -1) return;
+      S.histIdx++;
+      if (S.histIdx >= S.history.length) { S.histIdx = -1; S.input = S.histDraft; }
+      else S.input = S.history[S.histIdx];
+    }
+    S.cursor = S.input.length;
+    S.compIdx = -1;
+    render();
+  }
+  function completeInput() {
+    const low = S.input.toLocaleLowerCase('tr');
+    if (S.compIdx < 0) {
+      const base = ['yardım', 'linklerim', 'saat kaç', 'tarih', 'gündem', 'hava durumu', 'uygulamaları listele', 'veri'];
+      const all = base.concat(S.history.slice(-50));
+      const set = [];
+      for (const c of all) if (c && !set.includes(c)) set.push(c);
+      S.compList = (low ? set.filter((c) => c.toLocaleLowerCase('tr').startsWith(low) && c.toLocaleLowerCase('tr') !== low) : []);
+      S.compIdx = 0;
+    } else {
+      S.compIdx++;
+    }
+    if (S.compList.length) {
+      S.input = S.compList[S.compIdx % S.compList.length];
+      S.cursor = S.input.length;
+    } else {
+      S.compIdx = -1;
+    }
+    render();
+  }
+  function confirmResolve(yes) {
+    const u = S.confirmUrl, nm = S.confirmName;
+    S.confirmUrl = null; S.confirmName = '';
+    if (yes) {
+      try { openUrl(u); } catch (e) {}
+      push('✓ ' + (nm || tuiHostOf(u)) + ' açıldı.', 'a');
+      saveState();
+    } else {
+      flash('Vazgeçildi');
+    }
+    render();
+  }
+  function escAction() {
+    if (S.panel) { closePanel(); return; }
+    if (S.confirmUrl) { confirmResolve(false); return; }
+    S.input = ''; S.cursor = 0; S.compIdx = -1;
+    render();
+  }
+  async function submit() {
+    if (S.panel) { closePanel(); return; }
+    const t = S.input.trim();
+    S.input = ''; S.cursor = 0; S.compIdx = -1; S.histIdx = -1;
+    if (!t) { render(); return; }
+    if (S.confirmUrl) { S.confirmUrl = null; S.confirmName = ''; }
+    if (t === '/cikis' || t === '/exit' || t === 'cikis' || t === 'exit' || t === 'quit' || t === 'çıkış') {
+      saveCtx(); saveState(); cleanup(); process.exit(0); return;
+    }
+    if (t === '/link' || t === 'linklerim' || t === 'linkler') {
+      push(t, 'u'); openLinks(); saveState(); return;
+    }
+    if (t === '/veri') {
+      push(t, 'u'); push(dataStats(), 'a');
+      while (S.lines.length > MAXLINES) S.lines.shift();
+      render(); return;
+    }
+    if (t === '/yardim' || t === '/yardım' || t === 'yardim' || t === 'yardım') { showHelp(t); return; }
+    if (t === '/tema' || t.startsWith('/tema ')) {
+      const arg = t.slice(5).trim().toLocaleLowerCase('tr');
+      if (!arg) S.theme = S.theme === 'koyu' ? 'acik' : 'koyu';
+      else if (arg === 'acik' || arg === 'açık') S.theme = 'acik';
+      else if (arg === 'koyu') S.theme = 'koyu';
+      S.C = tuiColorCodes(S.theme);
+      needClear = true;
+      saveState();
+      flash('Tema: ' + (S.theme === 'acik' ? 'açık' : 'koyu'));
+      render(); return;
+    }
+    if (/^[1-9]$/.test(t)) {
+      const n = parseInt(t, 10);
+      if (S.pendingUrls.length) {
+        if (n >= 1 && n <= S.pendingUrls.length) {
+          const u = S.pendingUrls[n - 1];
+          S.pendingUrls = [];
+          push(t, 'u');
+          try { openUrl(u); } catch (e) {}
+          push('✓ ' + tuiHostOf(u) + ' açıldı.', 'a');
+          saveState(); render(); return;
+        }
+        S.pendingUrls = [];
+      }
+      if (n <= MYLINK_ITEMS.length) {
+        const it = MYLINK_ITEMS[n - 1];
+        push(t, 'u');
+        try { openUrl(it.url); } catch (e) {}
+        push('✓ ' + it.label + ' açıldı.', 'a');
+        saveState(); render(); return;
+      }
+    }
+    push(t, 'u');
+    S.history.push(t);
+    while (S.history.length > 80) S.history.shift();
+    loadCtx();
+    S.busy = true; S.busyStart = Date.now(); S.pendingUrls = []; S.offset = 0;
+    render();
+    try {
+      pendingSiteOpen = null;
+      const out = String(await answer(t));
+      S.busy = false;
+      const msg = { para: '', who: 'a' };
+      S.lines.push(msg);
+      const full = out;
+      const words = full.split(/(\s+)/);
+      let wi = 0, lastR = 0;
+      await new Promise((resolve) => {
+        const step = () => {
+          let chunk = '';
+          for (let k = 0; k < 3 && wi < words.length; k++, wi++) chunk += words[wi];
+          msg.para += chunk;
+          const now = Date.now();
+          if (now - lastR > 70 || wi >= words.length) { lastR = now; render(); }
+          if (wi >= words.length) resolve();
+          else setTimeout(step, 30);
+        };
+        step();
+      });
+      while (S.lines.length > MAXLINES) S.lines.shift();
+      const urls = extractUrls(out);
+      const direct = urls.filter(isDirectUrl);
+      const rest = urls.filter((u) => !isDirectUrl(u));
+      for (const u of direct) { try { openUrl(u); } catch (e) {} }
+      if (pendingSiteOpen) {
+        S.confirmUrl = pendingSiteOpen;
+        S.confirmName = tuiHostOf(pendingSiteOpen);
+        pendingSiteOpen = null;
+      } else if (rest.length) {
+        S.pendingUrls = rest;
+        const pl = ['⚠ Açmak için numara yaz:'];
+        rest.forEach((u, i) => pl.push('  ' + (i + 1) + ') ' + u));
+        push(pl.join('\n'), 'a');
+        while (S.lines.length > MAXLINES) S.lines.shift();
+      }
+      saveCtx(); saveState();
+    } catch (e) {
+      S.busy = false;
+      push('✗ Hata: ' + e.message, 'a');
+      saveState();
+    }
+    render();
+  }
+  function onMouseClick(x, y) {
+    if (S.panel) { closePanel(); return true; }
+    for (const r of S.linkRegions) {
+      if (y === r.row && x - 1 >= r.x0 && x - 1 < r.x1) { try { openUrl(r.url); } catch (e) {} flash('Açılıyor: ' + r.url); render(); return true; }
+    }
+    for (const r of S.urlRegions) {
+      if (y === r.row && x - 1 >= r.x0 && x - 1 < r.x1) { try { openUrl(r.url); } catch (e) {} flash('Açılıyor: ' + r.url); render(); return true; }
+    }
+    const g = S.inputGeom;
+    if (g && y === g.row && x - 1 >= g.x0 - 2 && x - 1 <= g.x0 + g.len) {
+      S.cursor = Math.max(0, Math.min(S.input.length, g.win + (x - 1 - g.x0)));
+      render(); return true;
+    }
+    return false;
+  }
+  // Terminal boyutu: acilista yetkili kaynaktan olc + pencere degisimlerini izle
   let termSizeQueried = false;
   function queryTermSize() {
     return new Promise((resolve) => {
@@ -2375,17 +2820,8 @@ async function tuiLoop() {
         if (process.stdout.columns > 0) TERM.w = process.stdout.columns;
         if (process.stdout.rows > 0) TERM.h = process.stdout.rows;
       };
-      if (process.env.WT_SESSION) {
-        fromStdout();
-        resolve();
-        return;
-      }
-      // Zaten 1 kez sorgulandiysa bir daha powershell acma (flash yapar).
-      if (termSizeQueried) {
-        fromStdout();
-        resolve();
-        return;
-      }
+      if (process.env.WT_SESSION) { fromStdout(); resolve(); return; }
+      if (termSizeQueried) { fromStdout(); resolve(); return; }
       if (process.platform === 'win32' && stdout.isTTY) {
         try {
           termSizeQueried = true;
@@ -2432,13 +2868,11 @@ async function tuiLoop() {
     try { stdout.write('\x1b[999;999H\x1b[6n'); } catch (e) {}
     setTimeout(() => finish(0, 0, false), 400);
   }
-  let sizeTimer = null;
   function watchTermSize() {
-    // Powershell YOK: sadece stdout.columns/rows izlenir, spawn yapilmaz.
     const syncFromStdout = () => {
       try {
         const w = process.stdout.columns || 0, h = process.stdout.rows || 0;
-        if (w >= 40 && h >= 20 && (w !== TERM.w || h !== TERM.h)) {
+        if (w >= 40 && h >= 16 && (w !== TERM.w || h !== TERM.h)) {
           TERM.w = w; TERM.h = h;
           needClear = true;
           try { render(); } catch (e) {}
@@ -2455,454 +2889,196 @@ async function tuiLoop() {
     sizeTimer = setInterval(syncFromStdout, 2000);
     try { sizeTimer.unref(); } catch (e) {}
   }
-
-  // Acilis animasyonu: donen imlec + ilerleme cubugu + sure (tam ekran duzen)
-  async function splashLoad() {
-    const SPIN = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-    let si = 0, done = 0, total = 1, finished = false;
-    const t0 = Date.now();
-    const draw = () => {
-      const { w, h } = tuiSize();
-      const logo = logoLines();
-      const logoW = Math.max(...logo.map(visibleLen));
-      const lx = Math.max(0, Math.floor((w - logoW) / 2));
-      const lines = [];
-      for (const row of logo) lines.push(' '.repeat(lx) + row);
-      lines.push('');
-      const pct = total > 0 ? Math.min(1, done / total) : 0;
-      const msg = finished ? 'Hazır!' : 'Pollux açılıyor...';
-      const cx = Math.max(0, Math.floor((w - 24) / 2));
-      lines.push(' '.repeat(cx) + GOLD + SPIN[si % SPIN.length] + RESET + '  ' + AGRAY + msg + RESET);
-      const bw2 = Math.min(34, w - 10);
-      const fill = Math.round(pct * bw2);
-      const bx2 = Math.max(0, Math.floor((w - (bw2 + 6)) / 2));
-      let detail = ' ' + AGRAY + Math.round(pct * 100) + '%' + RESET;
-      if (total > 1048576) {
-        detail += DIM + ' • ' + Math.round(done / 1048576) + '/' + Math.round(total / 1048576) + 'MB' + RESET;
-        const el = (Date.now() - t0) / 1000;
-        if (!finished && done > 10485760 && el > 3) {
-          const secs = Math.round((el * (total - done)) / done);
-          detail += DIM + ' • ~' + (secs >= 90 ? Math.round(secs / 60) + ' dk' : Math.max(1, secs) + ' sn') + ' kaldı' + RESET;
-        }
-      }
-      lines.push(' '.repeat(bx2) + DIM + '[' + RESET + GREEN + '━'.repeat(fill) + RESET + DIM + '─'.repeat(Math.max(0, bw2 - fill)) + RESET + DIM + ']' + RESET + detail);
-      const foot = finished ? dataStats() : 'İlk açılışta tam veri seti yüklenir (bir kez) • Wi-Fi önerilir';
-      const footShow = foot.length > w - 2 ? foot.slice(0, w - 2) : foot;
-      const fx = Math.max(0, Math.floor((w - visibleLen(footShow)) / 2));
-      const padTop = Math.max(0, Math.floor((h - lines.length - 2) / 2));
-      const frame = [];
-      for (let i = 0; i < padTop; i++) frame.push('');
-      for (const ln of lines) frame.push(ln);
-      while (frame.length < h - 1) frame.push('');
-      frame.push(' '.repeat(fx) + DIM + footShow + RESET);
-      const out = frame.slice(0, h).map((ln) => {
-        const v = visibleLen(ln);
-        return v < w ? ln + RESET + ' '.repeat(w - v) : ln;
-      });
-      stdout.write('\x1b[H\x1b[?25l' + (needClear ? '\x1b[2J' : '') + out.join('\n'));
-      needClear = false;
-    };
-    draw();
-    const timer = setInterval(() => { si++; draw(); }, 90);
-    await ensureKnowledge((d, t) => { done = d; total = t || 1; });
-    finished = true;
-    draw();
-    clearInterval(timer);
-    needClear = true;
-  }
-
-  function push(text, who, topics) {
-    // Ham paragraf sakla; sarma + renklendirme render'da (pencere boyuna uyar)
-    const tab = cur();
-    for (const para of String(text).split('\n')) {
-      tab.lines.push({ para, who, topics: who === 'a' ? (topics || []) : [] });
-    }
-    while (tab.lines.length > 200) tab.lines.shift();
-  }
-  // Konu kelimelerini yesil yap (buyuk-kucuk harf duyarsiz; uzun once)
-  function greenTopics(line, topics) {
-    let out = line;
-    const sorted = [...new Set(topics)].filter((t) => t && t.length >= 4)
-      .sort((a, b) => b.length - a.length);
-    const done = [];
-    for (const t of sorted) {
-      const low = t.toLocaleLowerCase('tr');
-      if (done.some((d) => d.includes(low))) continue; // uzun olani zaten boyadi
-      const esc = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      try {
-        const re = new RegExp(esc, 'gi');
-        if (!re.test(out)) continue;
-        out = out.replace(re, (m) => GREEN + m + AGRAY);
-        done.push(low);
-      } catch (e) {}
-    }
-    return out;
-  }
-  function flash(msg) {
-    state.status = msg;
-    state.statusUntil = Date.now() + 2500;
-  }
-  let needClear = true; // ilk kare + pencere boyutu degisince tam temizle
-  function visibleLen(s) { return s.replace(/\x1b\[[0-9;]*m/g, '').length; }
-  function render() {
-    const { w, h } = tuiSize();
-    const logo = logoLines();
-    const logoW = Math.max(...logo.map(visibleLen));
-    const logoX = Math.max(0, Math.floor((w - logoW) / 2));
-    // Sohbet cercevesi: dis kutu, iceride sagda kullanici / solda asistan
-    const HB = Math.min(w - 4, 100);
-    const hx = Math.max(0, Math.floor((w - HB) / 2));
-    const IW = HB - 2;
-    const wrapW = Math.max(20, IW - 2);
-    const histRows = Math.max(1, h - 16);
-    // Gorunen satirlar: mesaj arasi 1, konusma donusu arasi 2 bos satir
-    function expanded() {
-      const rows = [];
-      for (const m of cur().lines) {
-        const body = m.who === 'u' ? '> ' + m.para : m.para;
-        for (const ln of tuiWrap(body, wrapW)) rows.push({ t: ln, who: m.who, topics: m.topics });
-        rows.push({ gap: true });
-        if (m.who === 'a') rows.push({ gap: true });
-      }
-      while (rows.length && rows[rows.length - 1].gap) rows.pop();
-      return rows;
-    }
-    const rows = expanded();
-    const off = Math.min(cur().offset, Math.max(0, rows.length - histRows));
-    cur().offset = off;
-    const tail = off === 0 ? rows.slice(-histRows)
-      : rows.slice(Math.max(0, rows.length - histRows - off), rows.length - off);
-    const frame = [];
-    frame.push(tabBar(w));
-    for (const row of logo) frame.push(' '.repeat(logoX) + row);
-    // Sohbet kutusu ustu (aktif sekme adiyla)
-    const boxTitle = ' ✦ ' + (cur().name || 'Sohbet') + ' ';
-    const boxFill = Math.max(0, IW - 1 - visibleLen(boxTitle));
-    frame.push(' '.repeat(hx) + DIM + '┌─' + RESET + BRIGHT + boxTitle + RESET + DIM + '─'.repeat(boxFill) + '┐' + RESET);
-    const framed = (inner, vlen) => {
-      const text = inner + ' '.repeat(Math.max(0, IW - vlen));
-      return ' '.repeat(hx) + DIM + '│' + RESET + text + DIM + '│' + RESET;
-    };
-    state.urlRegions = [];
-    const HROW = 11; // tail[0] -> terminal 1. satir no
-    for (let j = 0; j < tail.length; j++) {
-      const ln = tail[j];
-      if (ln.gap) { frame.push(framed('', 0)); continue; }
-      if (ln.who === 'u') {
-        const pad = Math.max(0, IW - visibleLen(ln.t));
-        frame.push(' '.repeat(hx) + DIM + '│' + RESET + ' '.repeat(pad) + BRIGHT + ln.t + RESET + DIM + '│' + RESET);
-        collectUrls(ln.t, HROW + j, hx + 1 + pad);
-      } else {
-        let t = ln.t;
-        let bar = GREEN;
-        if (t.startsWith('[!]')) bar = MRED;
-        if (t.startsWith('Bağlantı:')) {
-          // Etiket gri, adres boguk kirmizi
-          t = 'Bağlantı: ' + MRED + t.slice('Bağlantı:'.length).trim() + AGRAY;
-        } else {
-          if (!t.startsWith('[!]')) t = greenTopics(t, ln.topics);
-          // Kaynak + yapay zeka etiketi boguk kirmizi (civitmaz)
-          t = t.replace(/\(Kaynak: [^)]+\)/g, (mm) => MRED + mm + AGRAY)
-               .replace(/\(Yapay zeka yanıtı\)/g, (mm) => MRED + mm + AGRAY);
-        }
-        frame.push(framed(' ' + bar + '│ ' + RESET + AGRAY + t + RESET, 3 + visibleLen(ln.t)));
-        collectUrls(ln.t, HROW + j, hx + 1 + 3);
-      }
-    }
-    while (frame.length < h - 6) frame.push(framed('', 0));
-    // Sohbet kutusu alti
-    frame.push(' '.repeat(hx) + DIM + '└' + '─'.repeat(Math.max(0, IW)) + '┘' + RESET);
-    // Giris kutusu (yuvarlak, altin cerceve)
-    const bw = Math.min(w - 8, 64);
-    const bx = Math.max(0, Math.floor((w - bw) / 2));
-    const fw = Math.max(10, bw - 5); // yazi alani ('│ › ' sonrasi)
-    const title = state.renaming ? '✦ Sekme adı' : '✦ Pollux';
-    frame.push(' '.repeat(bx) + GOLD + '╭─ ' + RESET + BRIGHT + title + RESET + GOLD + ' ' + '─'.repeat(Math.max(0, bw - 13)) + '╮' + RESET);
-    const hintText = 'Ask anything... "Van kedisi nedir"';
-    const hint = hintText.length > bw - 3 ? hintText.slice(0, bw - 3) : hintText;
-    frame.push(' '.repeat(bx) + GOLD + '│' + RESET + ' ' + DIM + hint + RESET + ' '.repeat(Math.max(0, (bw - 2) - 1 - visibleLen(hint))) + GOLD + '│' + RESET);
-    const text = state.input;
-    const shown = text.length > fw ? text.slice(text.length - fw) : text;
-    const cursorInShown = Math.min(shown.length, Math.max(0, state.cursor - (text.length - shown.length)));
-    frame.push(' '.repeat(bx) + GOLD + '│' + RESET + ' ' + GOLD + '›' + RESET + ' ' + BRIGHT + shown + RESET + ' '.repeat(Math.max(0, fw - shown.length)) + GOLD + '│' + RESET);
-    state.inputGeom = { row: h - 2, x0: bx + 4, len: shown.length, win: text.length - shown.length };
-    frame.push(' '.repeat(bx) + GOLD + '╰' + '─'.repeat(Math.max(0, bw - 2)) + '╯' + RESET);
-    // Alt durum satiri: ~ solda, My Links sagda
-    const link = 'My Links';
-    state.linkRow = h;
-    state.linkCol = w - 7;
-    if (state.busy) state.dots++;
-    const status = (Date.now() < state.statusUntil || state.busy)
-      ? (state.busy ? 'düşünüyor' + '.'.repeat(1 + (state.dots % 3)) : state.status) : '';
-    let bar2 = DIM + '~' + RESET;
-    let barVis = 1;
-    if (status && (1 + 2 + visibleLen(status)) <= Math.max(0, w - 9)) {
-      bar2 += '  ' + DIM + status + RESET;
-      barVis = 1 + 2 + visibleLen(status);
-    }
-    frame.push(bar2 + ' '.repeat(Math.max(1, w - barVis - 8)) + BRIGHT + link + RESET);
-    // Tek seferde yaz: basa don, temizlemeden uzerine (titreme yok)
-    const out = frame.slice(0, h).map((ln) => {
-      const v = visibleLen(ln);
-      return v < w ? ln + RESET + ' '.repeat(w - v) : ln;
-    });
-    let s = '\x1b[H\x1b[?25l' + (needClear ? '\x1b[2J' : '') + out.join('\n');
-    needClear = false;
-    stdout.write(s);
-    // Donanim imleci giris kutusuna koy
-    const crow = h - 2, ccol = bx + 5 + cursorInShown;
-    stdout.write('\x1b[' + crow + ';' + ccol + 'H\x1b[?25h');
-  }
   function cleanup() {
+    try { clearInterval(timer); } catch (e) {}
+    try { clearInterval(onlineTimer); } catch (e) {}
     try { if (sizeTimer) clearInterval(sizeTimer); } catch (e) {}
-    try { stdout.write('\x1b[?1000l\x1b[?1006l\x1b[?25h' + RESET + '\n'); } catch (e) {}
+    try { stdout.write('\x1b[?1000l\x1b[?1006l\x1b[?25h\x1b[0m\n'); } catch (e) {}
     try { stdin.setRawMode(false); } catch (e) {}
     try { stdin.removeAllListeners('data'); } catch (e) {}
   }
-  async function submit() {
-    const t = state.input.trim();
-    const tab = cur();
-    state.input = ''; state.cursor = 0; tab.offset = 0;
-    if (!t) { render(); return; }
-    if (state.renaming) {
-      state.renaming = false;
-      if (!t.startsWith('/') && t.length <= 24) {
-        tab.name = t;
-        flash('Sekme adı: ' + t);
+  async function splashLoad() {
+    S.inSplash = true;
+    let si = 0, done = 0, total = 1, finished = false;
+    const t0 = Date.now();
+    const mid = (segs, w2) => {
+      const len = segs.reduce((a, s2) => a + s2[1].length, 0);
+      const x = Math.max(0, Math.floor((w2 - len) / 2));
+      return { segs: [['', ' '.repeat(x)], ...segs] };
+    };
+    const draw = () => {
+      const { w, h } = tuiSize();
+      const rows = [];
+      const logo = mid([['a!', '✦ ─────── ✧'], ['', '   '], ['b', 'POLLUX']], w);
+      const pct = total > 0 ? Math.min(1, done / total) : 0;
+      const msg = finished ? 'hazır' : 'pollux açılıyor…';
+      const spinRow = mid([['a', TUI_SPIN[si % TUI_SPIN.length]], ['d', '  ' + msg]], w);
+      const bw = Math.min(34, Math.max(10, w - 12));
+      const fill = Math.round(pct * bw);
+      let detail = '  ' + Math.round(pct * 100) + '%';
+      if (total > 1048576) {
+        detail += ' • ' + Math.round(done / 1048576) + '/' + Math.round(total / 1048576) + 'MB';
+        const el = (Date.now() - t0) / 1000;
+        if (!finished && done > 10485760 && el > 3) {
+          const secs = Math.round((el * (total - done)) / done);
+          detail += ' • ~' + (secs >= 90 ? Math.round(secs / 60) + ' dk' : Math.max(1, secs) + ' sn') + ' kaldı';
+        }
       }
-      saveTabs(); render(); return;
-    }
-    if (t === '/cikis' || t === '/exit' || t === 'cikis' || t === 'exit' || t === 'quit') {
-      saveCtx(tab); saveTabs(); cleanup(); process.exit(0); return;
-    }
-    if (t === '/link' || t === 'linklerim' || t === 'linkler') {
-      push(t, 'u'); openUrl(LINKS_URL); flash('Bağlantıların açılıyor...');
-      saveTabs(); render(); return;
-    }
-    if (t === '/ad' || t.startsWith('/ad ')) {
-      const nm = t.slice(3).trim().slice(0, 24);
-      if (nm) { tab.name = nm; flash('Sekme adı: ' + nm); }
-      else flash('Kullanım: /ad Yeni İsim (veya F2)');
-      saveTabs(); render(); return;
-    }
-    if (t === '/veri') { push(dataStats(), 'a'); flash('Veri kapsamı: 100 milyon+ kayıt'); saveTabs(); render(); return; }
-    if (/^[0-9]+$/.test(t) && tab.pendingUrls.length) {
-      const n = parseInt(t, 10);
-      if (n >= 1 && n <= tab.pendingUrls.length) {
-        openUrl(tab.pendingUrls[n - 1]);
-        flash('Açılıyor: ' + tab.pendingUrls[n - 1]);
-      }
-      tab.pendingUrls = [];
-      saveTabs(); render(); return;
-    }
-    push(t, 'u');
-    if (/^Sohbet \d+$/.test(tab.name || '')) {
-      tab.name = t.length > 18 ? t.slice(0, 18) + '…' : t;
-    }
-    loadCtx(tab);
-    state.busy = true; tab.pendingUrls = []; state.dots = 0;
-    render();
-    const spin = setInterval(() => {
-      if (!state.busy) { clearInterval(spin); return; }
-      render();
-    }, 400);
+      const bar = mid([['a', '━'.repeat(fill)], ['rule', '─'.repeat(Math.max(0, bw - fill))], ['d', detail]], w);
+      const block = [logo, { segs: [] }, spinRow, bar];
+      const padTop = Math.max(0, Math.floor((h - block.length - 2) / 2));
+      for (let i = 0; i < padTop; i++) rows.push({ segs: [] });
+      for (const b of block) rows.push(b);
+      while (rows.length < h - 1) rows.push({ segs: [] });
+      const foot = finished ? dataStats() : 'İlk açılışta tam veri seti yüklenir (bir kez) • Wi-Fi önerilir';
+      const f = foot.length > w - 4 ? foot.slice(0, w - 4) : foot;
+      const fx = Math.max(0, Math.floor((w - f.length) / 2));
+      rows.push({ segs: [['', ' '.repeat(fx)], ['d', f]] });
+      paint(rows);
+    };
+    draw();
+    const timer2 = setInterval(() => { si++; draw(); }, 90);
+    await ensureKnowledge((d, t2) => { done = d; total = t2 || 1; });
+    finished = true;
+    draw();
+    clearInterval(timer2);
+    needClear = true;
+    S.inSplash = false;
+  }
+  async function checkOnline() {
     try {
-      const out = await answer(t);
-      clearInterval(spin);
-      state.busy = false;
-      const qw = cleanTopic(t).split(' ').filter((x) => x);
-      const topics = qw.slice();
-      for (let i = 0; i + 1 < qw.length; i++) topics.push(qw[i] + ' ' + qw[i + 1]);
-      // Akici yaz: once tum metni paragrafla, sonra kelime kelime buyut
-      const paras = String(out).split('\n');
-      const msg = { para: '', who: 'a', topics };
-      tab.lines.push(msg);
-      while (tab.lines.length > 200) tab.lines.shift();
-      const full = paras.join('\n');
-      const words = full.split(/(\s+)/);
-      let wi = 0;
-      let lastR = 0;
-      await new Promise((resolve) => {
-        const step = () => {
-          let chunk = '';
-          for (let k = 0; k < 3 && wi < words.length; k++, wi++) chunk += words[wi];
-          msg.para += chunk;
-          const now = Date.now();
-          if (now - lastR > 70 || wi >= words.length) { lastR = now; render(); }
-          if (wi >= words.length) resolve();
-          else setTimeout(step, 35);
-        };
-        step();
-      });
-      const urls = extractUrls(out);
-      const direct = urls.filter(isDirectUrl);
-      const rest = urls.filter((u) => !isDirectUrl(u));
-      for (const u of direct) openUrl(u);
-      if (rest.length) {
-        tab.pendingUrls = rest;
-        push('[!] Açmak için numarayı yaz (' + rest.map((u, i) => (i + 1) + ') ' + u).join('  ') + ')', 'a');
+      const ok = await hasInternet();
+      if (ok !== S.online) {
+        S.online = ok;
+        if (!S.inSplash) { try { render(); } catch (e) {} }
       }
-      saveCtx(tab); saveTabs();
-    } catch (e) {
-      clearInterval(spin);
-      state.busy = false;
-      push('Hata: ' + e.message, 'a');
-      saveTabs();
+    } catch (e) {}
+  }
+  async function tuiTestMode() {
+    S.plain = process.env.POLLUX_TUI_PLAIN === '1';
+    TERM.w = parseInt(process.env.POLLUX_TUI_W || '100', 10) || 100;
+    TERM.h = parseInt(process.env.POLLUX_TUI_H || '30', 10) || 30;
+    loadState();
+    S.C = tuiColorCodes(process.env.POLLUX_TUI_THEME || S.theme);
+    S.online = process.env.POLLUX_TUI_ONLINE === '1';
+    const demo = process.env.POLLUX_TUI_DEMO || '';
+    if (demo) S.lines = [];
+    if (demo === 'chat') {
+      push('5+7*3', 'u'); push('26', 'a');
+      push('notepad aç', 'u'); push('✓ Notepad açıldı', 'a');
+      push('youtube aç', 'u'); push('⚠ youtube.com tarayıcıda açılacak.', 'a');
+      S.confirmUrl = 'https://www.youtube.com'; S.confirmName = 'youtube.com';
+      push('qwxz', 'u'); push('Bunu anlayamadım. "yardım" yazarsan neler yapabildiğimi gösteririm.', 'a');
+      push('hava durumu', 'u'); push('✗ İnternet yok, canlı veriyi çekemiyorum.\n  Bilgi bankasından çevrimdışı yanıt verebilirim.', 'a');
+    } else if (demo === 'help') {
+      push('yardım', 'u'); S.panel = true; S.helpBase = 1;
+    } else if (demo === 'busy') {
+      push("ay'a ilk kim gitti araştır", 'u');
+      S.busy = true; S.busyStart = Date.now() - 2000; S.spin = 3;
     }
     render();
   }
 
-  function openLinks() {
-    flash('Bağlantıların açılıyor...');
-    render();
-    try {
-      const cp = require('child_process');
-      const u = LINKS_URL.replace(/"/g, '');
-      // 2 yontem sirasiyla dene (biri calisir)
-      cp.exec('start "" "' + u + '"', { windowsHide: true }, (err) => {
-        if (err) {
-          cp.exec('rundll32 url.dll,FileProtocolHandler "' + u + '"', { windowsHide: true }, (err2) => {
-            if (err2) flash('Açılamadı, adres: ' + LINKS_URL);
-            render();
-          });
-        }
-      });
-    } catch (e) {
-      flash('Açılamadı, adres: ' + LINKS_URL);
-      render();
-    }
-  }
-  function onMouseClick(x, y) {
-    // Sekmeler (1. satir): govdeye tikla gec, × isaretine tikla kapat
-    if (y === 1 && state.tabRegions) {
-      for (const r of state.tabRegions) {
-        if (x - 1 >= r.x0 && x - 1 < r.x1) {
-          if (r.close) closeTabAt(r.i);
-          else switchToTab(r.i);
-          return true;
-        }
-      }
-      return false;
-    }
-    // My Links
-    if (y === state.linkRow && x >= state.linkCol && x < state.linkCol + 8) {
-      openLinks();
-      return true;
-    }
-    // Sohbetteki baglanti: tikla, dogrudan ac
-    if (state.urlRegions) {
-      for (const r of state.urlRegions) {
-        if (r.row === y && x - 1 >= r.x0 && x - 1 < r.x1) {
-          try { openUrl(r.url); } catch (e) {}
-          flash('Açılıyor: ' + r.url);
-          render();
-          return true;
-        }
-      }
-    }
-    // Giris kutusuna tikla: imleci oraya koy
-    const g = state.inputGeom;
-    if (g && y === g.row && x - 1 >= g.x0 && x - 1 <= g.x0 + g.len) {
-      state.cursor = Math.max(0, Math.min(state.input.length, g.win + (x - 1 - g.x0)));
-      render();
-      return true;
-    }
-    return false;
-  }
+  if (process.env.POLLUX_TUI_TEST) { await tuiTestMode(); return; }
 
+  loadState();
+  S.C = tuiColorCodes(S.theme);
   stdin.setRawMode(true);
   stdin.resume();
-  // Boyut: yetkili kaynaktan olc + pencere degisimlerini izle
   try { await queryTermSize(); } catch (e) {}
   watchTermSize();
-  stdout.write('\x1b[?1000h\x1b[?1006h');
-  loadTabs();
-  loadCtx(cur());
+  try { stdout.write('\x1b[?1000h\x1b[?1006h'); } catch (e) {}
+  checkOnline();
   await splashLoad();
   if (!process.env.WT_SESSION && !process.env.TERM_PROGRAM) {
-    flash('Fare çalışmazsa: Windows Terminal kullan • F1 ve sayı tuşları her zaman çalışır');
+    flash('İpucu: tıklanabilir bağlantılar için Windows Terminal kullan');
   }
   render();
   process.on('SIGWINCH', () => { needClear = true; render(); });
+  const timer = setInterval(() => {
+    let need = false;
+    if (S.busy) { S.spin = (S.spin + 1) % TUI_SPIN.length; need = true; }
+    S.blink++;
+    if (S.blink % 5 === 0) { S.cursorOn = !S.cursorOn; need = true; }
+    if (S.flashUntil && Date.now() >= S.flashUntil) { S.flashUntil = 0; need = true; }
+    if (need && !S.inSplash) { try { render(); } catch (e) {} }
+  }, 110);
+  onlineTimer = setInterval(checkOnline, 90000);
+  try { onlineTimer.unref(); } catch (e) {}
   let mouseBuf = '';
   const decoder = new (require('string_decoder').StringDecoder)('utf8');
   stdin.on('data', async (chunk) => {
     const str = decoder.write(chunk);
-    // F1: baglantilari acar, F2: sekmeyi yeniden adlandir
     if (str === '\x1bOP') { openLinks(); return; }
-    if (str === '\x1bOQ') { startRename(); return; }
-    // Ctrl+T yeni sekme, Ctrl+W kapat
-    if (str.includes('\x14')) { openTab(); return; }
-    if (str.includes('\x17')) { closeTab(); return; }
-    // Fare SGR: ESC [ < b ; x ; y M/m
-    mouseBuf += str;
-    const ctab = mouseBuf.match(/\x1b\[1;5([DC])/);
-    if (ctab) {
-      mouseBuf = '';
-      moveTab(ctab[1] === 'C' ? 1 : -1);
+    if (str === '\x1b[A' || str === '\x1bOA') { histMove(-1); return; }
+    if (str === '\x1b[B' || str === '\x1bOB') { histMove(1); return; }
+    if (str === '\x1b[D' || str === '\x1bOD') { if (S.cursor > 0) { S.cursor--; render(); } return; }
+    if (str === '\x1b[C' || str === '\x1bOC') { if (S.cursor < S.input.length) { S.cursor++; render(); } return; }
+    if (str === '\x1b[H' || str === '\x1b[1~' || str === '\x1b[7~') { S.cursor = 0; render(); return; }
+    if (str === '\x1b[F' || str === '\x1b[4~' || str === '\x1b[8~') { S.cursor = S.input.length; render(); return; }
+    if (str === '\x1b[3~') {
+      if (S.cursor < S.input.length) { S.input = S.input.slice(0, S.cursor) + S.input.slice(S.cursor + 1); render(); }
       return;
     }
-    const m = mouseBuf.match(/\x1b\[<(\d+);(\d+);(\d+)([Mm])/);
-    if (m) {
-      mouseBuf = '';
-      const btn = parseInt(m[1], 10);
-      if (m[4] === 'M' && (btn === 0 || btn === 1)) {
-        onMouseClick(parseInt(m[2], 10), parseInt(m[3], 10));
-      }
-      return;
+    if (str === '\x1b[5~') {
+      S.offset = (S.offset || 0) + Math.max(3, tuiSize().h - 7);
+      render(); return;
     }
-    // Fare eski kip: ESC [ M Cb Cx Cy (her biri +32)
-    const leg = mouseBuf.match(/\x1b\[M(.)(.)(.)/);
-    if (leg) {
-      mouseBuf = '';
-      const btn = leg[1].charCodeAt(0) - 32;
-      if (btn === 0 || btn === 1) {
-        onMouseClick(leg[2].charCodeAt(0) - 32, leg[3].charCodeAt(0) - 32);
-      }
-      return;
+    if (str === '\x1b[6~') {
+      S.offset = Math.max(0, (S.offset || 0) - Math.max(3, tuiSize().h - 7));
+      render(); return;
     }
-    if (mouseBuf.length > 32) mouseBuf = '';
-    if (str.startsWith('\x1b[') && !m) {
-      if (str === '\x1b[5~') { // PgUp: geriye sar
-        cur().offset = Math.min(cur().lines.length, cur().offset + Math.max(1, tuiSize().h - 12));
-        render(); return;
-      }
-      if (str === '\x1b[6~') { // PgDn: asagiya
-        cur().offset = Math.max(0, cur().offset - Math.max(1, tuiSize().h - 12));
-        render(); return;
-      }
-      if (str === '\x1b[D' && state.cursor > 0) { state.cursor--; render(); return; } // Sol
-      if (str === '\x1b[C' && state.cursor < state.input.length) { state.cursor++; render(); return; } // Sag
-      if (str === '\x1b[H') { state.cursor = 0; render(); return; } // Home
-      if (str === '\x1b[F') { state.cursor = state.input.length; render(); return; } // End
-      return; // diger ozel tuslari yoksay
-    }
-    for (const ch of str) {
-      if (ch === '\x03') { cleanup(); process.exit(0); return; } // Ctrl+C
-      else if (ch === '\x1b') {
-        if (state.renaming) { state.renaming = false; state.input = ''; state.cursor = 0; render(); return; }
-        cleanup(); process.exit(0); return; // Esc
-      }
-      else if (ch === '\r' || ch === '\n') {
-        if (!state.busy) await submit();
-        else render();
+    if (str.includes('\x1b[<') || str.includes('\x1b[M') || (mouseBuf && str.startsWith('\x1b'))) {
+      mouseBuf += str;
+      const m = mouseBuf.match(/\x1b\[<(\d+);(\d+);(\d+)([Mm])/);
+      if (m) {
+        mouseBuf = '';
+        const btn = parseInt(m[1], 10);
+        if (m[4] === 'M') {
+          if (btn === 0 || btn === 1) onMouseClick(parseInt(m[2], 10), parseInt(m[3], 10));
+          else if (btn === 64) { S.offset = (S.offset || 0) + 3; render(); }
+          else if (btn === 65) { S.offset = Math.max(0, (S.offset || 0) - 3); render(); }
+        }
         return;
       }
-      else if (ch === '\x7f' || ch === '\b') {
-        if (state.cursor > 0) {
-          state.input = state.input.slice(0, state.cursor - 1) + state.input.slice(state.cursor);
-          state.cursor--;
+      const leg = mouseBuf.match(/\x1b\[M(.)(.)(.)/);
+      if (leg) {
+        mouseBuf = '';
+        const btn = leg[1].charCodeAt(0) - 32;
+        if (btn === 0 || btn === 1) onMouseClick(leg[2].charCodeAt(0) - 32, leg[3].charCodeAt(0) - 32);
+        return;
+      }
+      if (mouseBuf.length > 64) mouseBuf = '';
+      return;
+    }
+    for (const ch of str) {
+      if (ch === '\x03') { saveCtx(); saveState(); cleanup(); process.exit(0); return; }
+      if (ch === '\x1b') { escAction(); return; }
+      if (ch === '\t') { completeInput(); return; }
+      if (ch === '\x0c') { S.input = ''; S.cursor = 0; S.compIdx = -1; render(); return; }
+      if (ch === '\r' || ch === '\n') {
+        if (!S.busy) { await submit(); } else render();
+        return;
+      }
+      if (ch === '\x7f' || ch === '\b') {
+        if (S.cursor > 0) { S.input = S.input.slice(0, S.cursor - 1) + S.input.slice(S.cursor); S.cursor--; S.compIdx = -1; }
+        continue;
+      }
+      if (ch >= ' ') {
+        if (S.panel) closePanel();
+        if (S.confirmUrl && !S.input) {
+          if (ch === 'e' || ch === 'E') { confirmResolve(true); return; }
+          if (ch === 'h' || ch === 'H') { confirmResolve(false); return; }
         }
-      } else if (ch >= ' ' && ch !== '\x7f') {
-        state.input = state.input.slice(0, state.cursor) + ch + state.input.slice(state.cursor);
-        state.cursor++;
+        S.input = S.input.slice(0, S.cursor) + ch + S.input.slice(S.cursor);
+        S.cursor++;
+        S.compIdx = -1;
       }
     }
     render();
   });
   await new Promise(() => {});
 }
-
 // ---------- giris ----------
 async function main() {
   const rawArgs = process.argv.slice(2);
@@ -2914,56 +3090,79 @@ async function main() {
   const autoOpen = rawArgs.includes('--ac');
   const wantChat = rawArgs.includes('--chat');
   const args = rawArgs.filter((a) => a !== '--ac' && a !== '--tui' && a !== '--chat');
-  if (!args.length && !wantChat && process.stdin.isTTY && process.stdout.isTTY) {
+  if (!args.length && !wantChat && (process.env.POLLUX_TUI_TEST || (process.stdin.isTTY && process.stdout.isTTY))) {
     await tuiLoop(); return;
   }
   if (args.length) {
     await ensureKnowledge(cliProgress());
+    pendingSiteOpen = null;
     const out = await answer(args.join(' '));
-    await streamWords(out, 18, (chunk) => process.stdout.write(chunk));
+    const shown = out === NOIDEA_TEXT ? '✗ Anlayamadım. "pollux yardım" ile komutları görebilirsin.' : out;
+    await streamWords(colorizePlain(shown), 18, (chunk) => process.stdout.write(chunk));
     process.stdout.write('\n');
     const urls = extractUrls(out);
     const direct = urls.filter(isDirectUrl);
-    const rest = urls.filter((u) => !isDirectUrl(u));
     for (const u of direct) openUrl(u);
-    if (rest.length && autoOpen) {
-      for (const u of rest) openUrl(u);
-    } else if (rest.length) {
-      console.log('\n[!] Bu cevap bağlantı içeriyor. Açmak için --ac ekle: pollux --ac "soru"');
-      rest.forEach((u) => console.log('    ' + u));
+    const targets = [];
+    if (pendingSiteOpen) { targets.push(pendingSiteOpen); pendingSiteOpen = null; }
+    for (const u of urls) if (!isDirectUrl(u) && !targets.includes(u)) targets.push(u);
+    if (targets.length && autoOpen) {
+      for (const u of targets) openUrl(u);
+    } else if (targets.length) {
+      console.log('⚠ Bu cevap bağlantı içeriyor. Açmak için --ac ekle: pollux --ac "soru"');
+      targets.forEach((u) => console.log('    ' + u));
     }
     return;
   }
-  console.log('Pollux, senin asistanın. (çıkış: /cikis)');
+  const tty = process.stdout.isTTY;
+  const CA = tty ? '\x1b[38;5;173m' : '';
+  const CB = tty ? '\x1b[1m' : '';
+  const CD = tty ? '\x1b[2m' : '';
+  const CZ = tty ? '\x1b[0m' : '';
+  let online0 = null;
+  try {
+    online0 = await Promise.race([hasInternet(), new Promise((res) => setTimeout(() => res(null), 1500))]);
+  } catch (e) { online0 = null; }
+  console.log(CA + '✦' + CZ + CB + ' pollux' + CZ + CD + ' · ' + (online0 === true ? 'çevrimiçi' : 'çevrimdışı') + ' · çıkmak için Ctrl+C' + CZ);
+  console.log('');
   await ensureKnowledge(cliProgress());
-  console.log(dataStats());
+  process.on('exit', () => { try { console.log(CD + '─'.repeat(64) + CZ); } catch (e) {} });
+  process.on('SIGINT', () => { try { process.exit(0); } catch (e) {} });
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  const ask = () => rl.question('sen> ', async (line) => {
+  const ask = () => rl.question(CA + '> ' + CZ, async (line) => {
     const t = line.trim();
     if (!t) return ask();
-    if (t === '/cikis' || t === '/exit' || t === 'cikis' || t === 'exit' || t === 'quit') { rl.close(); return; }
-    if (t === '/yardim') { console.log('Komutlar: /yardim, /veri, /cikis, /ogrenilenler'); return ask(); }
+    if (t === '/cikis' || t === '/exit' || t === 'cikis' || t === 'exit' || t === 'quit') { try { rl.close(); } catch (e) {} process.exit(0); return; }
+    if (t === '/yardim' || t === '/yardım' || t === 'yardim' || t === 'yardım') { console.log('Komutlar: /yardim, /veri, /cikis, /ogrenilenler'); return ask(); }
     if (t === '/veri') { console.log(dataStats()); return ask(); }
     if (t === '/ogrenilenler') { console.log('Öğrenilen kayıt: ' + learned.length); return ask(); }
+    pendingSiteOpen = null;
     const out = await answer(t);
-    process.stdout.write('pollux> ');
-    await streamWords(out, 18, (chunk) => process.stdout.write(chunk));
+    const shown = out === NOIDEA_TEXT ? '✗ Anlayamadım. "pollux yardım" ile komutları görebilirsin.' : out;
+    const site = pendingSiteOpen;
+    pendingSiteOpen = null;
+    if (site) {
+      rl.question(colorizePlain(shown) + CD + ' Devam? [e/h] ' + CZ, (sel) => {
+        const s2 = sel.trim().toLocaleLowerCase('tr');
+        if (s2 === 'e' || s2 === 'evet') { try { openUrl(site); } catch (e) {} }
+        ask();
+      });
+      return;
+    }
+    await streamWords(colorizePlain(shown), 18, (chunk) => process.stdout.write(chunk));
     process.stdout.write('\n');
     const urls = extractUrls(out);
     const direct = urls.filter(isDirectUrl);
     const rest = urls.filter((u) => !isDirectUrl(u));
     for (const u of direct) openUrl(u);
     if (!rest.length) return ask();
-    console.log('[!] Uygulamadan ayrılıyorsun. Bu bağlantı seni şu siteye götürüyor:');
-    rest.forEach((u, i) => console.log('    [' + (i + 1) + '] ' + u));
-    rl.question('Açayım mı? (numara / hepsi / geç) ', (sel) => {
-      const s = sel.trim().toLowerCase();
-      if (s === 'hepsi' || s === 'h' || s === 'hepsini ac') {
-        rest.forEach(openUrl);
-      } else {
-        const n = parseInt(s, 10);
-        if (n >= 1 && n <= rest.length) openUrl(rest[n - 1]);
-      }
+    console.log(CD + '────────────────────────────────────────────────────────────────' + CZ);
+    console.log('⚠ Bu cevapta bağlantılar var:');
+    rest.forEach((u, i) => console.log('    ' + (i + 1) + ') ' + u));
+    rl.question(CD + 'Açmak için numara yaz · hepsi için "hepsi" · geçmek için Enter ' + CZ, (sel) => {
+      const s2 = sel.trim().toLocaleLowerCase('tr');
+      if (s2 === 'hepsi' || s2 === 'h') rest.forEach(openUrl);
+      else { const n = parseInt(s2, 10); if (n >= 1 && n <= rest.length) openUrl(rest[n - 1]); }
       ask();
     });
   });

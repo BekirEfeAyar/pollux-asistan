@@ -2310,6 +2310,8 @@ const TUI_HELP_MODS = [
 ];
 const TUI_FOOT = '↑ ↓ geçmiş    Tab tamamla    Ctrl+L temizle    Esc kapat    Ctrl+C çıkış';
 const TUI_FOOT_HELP = 'Esc ile yardım kapanır    sohbete dönmek için herhangi bir tuş';
+const TUI_SUGGEST = ['yardım', 'linklerim', 'veri', 'tarih', 'gündem', 'hava durumu', 'saat kaç', 'uygulamaları listele'];
+const TUI_SLASH_SUGGEST = ['/yardım', '/link', '/veri', '/tema acik', '/tema koyu', '/cikis'];
 const TUI_SPIN = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏';
 
 async function tuiLoop() {
@@ -2326,6 +2328,7 @@ async function tuiLoop() {
     urlRegions: [], linkRegions: [], inputGeom: null,
     compIdx: -1, compList: [],
     panel: false, helpBase: 0, inSplash: false, plain: false,
+    lastRows: null,
   };
   let needClear = true;
   let sizeTimer = null;
@@ -2411,9 +2414,7 @@ async function tuiLoop() {
       stdout.write(out.join('\n') + '\n');
       return;
     }
-    const clear = needClear;
-    needClear = false;
-    let buf = '\x1b[?25l' + (clear ? '\x1b[2J' : '');
+    const lines = [];
     for (let r = 0; r < h; r++) {
       const row = rows[r] || { segs: [] };
       let line = C.bgEsc;
@@ -2425,8 +2426,21 @@ async function tuiLoop() {
       }
       if (len < w) line += ' '.repeat(w - len);
       line += C.resetAll;
-      buf += '\x1b[' + (r + 1) + ';1H' + line;
+      lines.push(line);
     }
+    const clear = needClear;
+    needClear = false;
+    let minR = 0, maxR = h - 1;
+    if (!clear && S.lastRows && S.lastRows.length === h) {
+      minR = Infinity; maxR = -1;
+      for (let r = 0; r < h; r++) {
+        if (lines[r] !== S.lastRows[r]) { if (r < minR) minR = r; if (r > maxR) maxR = r; }
+      }
+      if (maxR < 0) return; // hicbir satir degismedi
+    }
+    S.lastRows = lines;
+    let buf = '\x1b[?25l' + (clear ? '\x1b[2J' : '');
+    for (let r = minR; r <= maxR; r++) buf += '\x1b[' + (r + 1) + ';1H' + lines[r];
     stdout.write(buf);
   }
   function userRows(para, w) {
@@ -2596,15 +2610,24 @@ async function tuiLoop() {
       while (view.length < CH) view.push(blank());
       for (let i = 0; i < view.length; i++) view[i].screenRow = 3 + i;
       rows.push(...view);
-      // giris satiri
+      // giris satiri (ghost oneri: yazarken soluk tamamlama)
       const avail = Math.max(4, w - PAD * 2 - 2);
       const shown = S.input.length > avail ? S.input.slice(S.input.length - avail) : S.input;
       const win = S.input.length - shown.length;
       const cursorInShown = Math.max(0, Math.min(shown.length, S.cursor - win));
+      let ghost = '';
+      if (S.cursor === S.input.length && S.input.length >= 1 && !S.busy && !S.confirmUrl && !S.panel) {
+        const lw = S.input.toLocaleLowerCase('tr');
+        const pool = lw.startsWith('/') ? TUI_SLASH_SUGGEST : TUI_SUGGEST;
+        const hit = pool.find((c) => c.toLocaleLowerCase('tr').startsWith(lw) && c.toLocaleLowerCase('tr') !== lw);
+        if (hit) ghost = hit.slice(S.input.length);
+        if (ghost && S.input.length + 1 + ghost.length > avail) ghost = '';
+      }
       const pseg = [['', ' '.repeat(PAD)], ['a!', '❯ ']];
       pseg.push(['', shown.slice(0, cursorInShown)]);
       if (S.cursorOn) pseg.push(['cursor', '█']);
       pseg.push(['', shown.slice(cursorInShown)]);
+      if (ghost) pseg.push(['d', ghost]);
       rows.push(segRow(pseg));
       S.inputGeom = { row: h - 2, x0: PAD + 2, len: shown.length, win: win };
       // alt bilgi
@@ -2661,8 +2684,7 @@ async function tuiLoop() {
   function completeInput() {
     const low = S.input.toLocaleLowerCase('tr');
     if (S.compIdx < 0) {
-      const base = ['yardım', 'linklerim', 'saat kaç', 'tarih', 'gündem', 'hava durumu', 'uygulamaları listele', 'veri'];
-      const all = base.concat(S.history.slice(-50));
+      const all = TUI_SUGGEST.concat(TUI_SLASH_SUGGEST, S.history.slice(-50));
       const set = [];
       for (const c of all) if (c && !set.includes(c)) set.push(c);
       S.compList = (low ? set.filter((c) => c.toLocaleLowerCase('tr').startsWith(low) && c.toLocaleLowerCase('tr') !== low) : []);
@@ -2673,6 +2695,7 @@ async function tuiLoop() {
     if (S.compList.length) {
       S.input = S.compList[S.compIdx % S.compList.length];
       S.cursor = S.input.length;
+      if (S.compList.length > 1) flash('✧ ' + S.compList.slice(0, 4).join('   '));
     } else {
       S.compIdx = -1;
     }
@@ -2764,12 +2787,12 @@ async function tuiLoop() {
       await new Promise((resolve) => {
         const step = () => {
           let chunk = '';
-          for (let k = 0; k < 3 && wi < words.length; k++, wi++) chunk += words[wi];
+          for (let k = 0; k < 2 && wi < words.length; k++, wi++) chunk += words[wi];
           msg.para += chunk;
           const now = Date.now();
-          if (now - lastR > 70 || wi >= words.length) { lastR = now; render(); }
+          if (now - lastR > 45 || wi >= words.length) { lastR = now; render(); }
           if (wi >= words.length) resolve();
-          else setTimeout(step, 30);
+          else setTimeout(step, 20);
         };
         step();
       });
@@ -2962,6 +2985,7 @@ async function tuiLoop() {
     S.C = tuiColorCodes(process.env.POLLUX_TUI_THEME || S.theme);
     S.online = process.env.POLLUX_TUI_ONLINE === '1';
     const demo = process.env.POLLUX_TUI_DEMO || '';
+    if (process.env.POLLUX_TUI_INPUT) { S.input = process.env.POLLUX_TUI_INPUT; S.cursor = S.input.length; }
     if (demo) S.lines = [];
     if (demo === 'chat') {
       push('5+7*3', 'u'); push('26', 'a');
@@ -2977,6 +3001,7 @@ async function tuiLoop() {
       S.busy = true; S.busyStart = Date.now() - 2000; S.spin = 3;
     }
     render();
+    if (process.env.POLLUX_TUI_RENDER2 === '1') render();
   }
 
   if (process.env.POLLUX_TUI_TEST) { await tuiTestMode(); return; }
@@ -3002,7 +3027,7 @@ async function tuiLoop() {
     if (S.blink % 5 === 0) { S.cursorOn = !S.cursorOn; need = true; }
     if (S.flashUntil && Date.now() >= S.flashUntil) { S.flashUntil = 0; need = true; }
     if (need && !S.inSplash) { try { render(); } catch (e) {} }
-  }, 110);
+  }, 90);
   onlineTimer = setInterval(checkOnline, 90000);
   try { onlineTimer.unref(); } catch (e) {}
   let mouseBuf = '';
@@ -3090,6 +3115,27 @@ async function main() {
   const autoOpen = rawArgs.includes('--ac');
   const wantChat = rawArgs.includes('--chat');
   const args = rawArgs.filter((a) => a !== '--ac' && a !== '--tui' && a !== '--chat');
+  // pollux: her zaman YENI SEKMEDE acilir (Windows Terminal; yoksa yeni pencere)
+  if (process.platform === 'win32' && !args.length && !wantChat && !process.env.POLLUX_TUI_TEST && !process.env.POLLUX_TAB &&
+    process.stdin.isTTY && process.stdout.isTTY) {
+    const cp2 = require('child_process');
+    const env2 = Object.assign({}, process.env, { POLLUX_TAB: '1' });
+    let launched = false;
+    try {
+      cp2.execSync('where wt.exe', { stdio: 'ignore', windowsHide: true });
+      const t2 = cp2.spawn('wt.exe', ['-w', '0', 'nt', '--title', 'Pollux', 'cmd', '/c', 'pollux'], { env: env2, detached: true, stdio: 'ignore', windowsHide: true });
+      t2.unref();
+      launched = true;
+    } catch (e) {}
+    if (!launched) {
+      try {
+        const t3 = cp2.spawn('cmd', ['/c', 'start', '', 'cmd', '/c', 'pollux'], { env: env2, detached: true, stdio: 'ignore', windowsHide: true });
+        t3.unref();
+        launched = true;
+      } catch (e) {}
+    }
+    if (launched) { console.log('✦ Pollux yeni bir sekmede açılıyor...'); return; }
+  }
   if (!args.length && !wantChat && (process.env.POLLUX_TUI_TEST || (process.stdin.isTTY && process.stdout.isTTY))) {
     await tuiLoop(); return;
   }

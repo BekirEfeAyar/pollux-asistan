@@ -2335,29 +2335,18 @@ async function tuiLoop() {
   let onlineTimer = null;
 
   function loadState() {
+    // Her acilis sifir: yalnizca tema hatirlanir; yazilar/gecmis/baglam tasinmaz.
     try {
       const d = JSON.parse(fs.readFileSync(CHATS_FILE, 'utf8'));
       if (d && typeof d.theme === 'string' && TUI_THEMES[d.theme]) S.theme = d.theme;
-      if (d && Array.isArray(d.tabs) && d.tabs.length) {
-        const t = d.tabs[Math.max(0, Math.min(d.active || 0, d.tabs.length - 1))];
-        if (t) {
-          S.lines = (Array.isArray(t.lines) ? t.lines : [])
-            .filter((m) => m && typeof m.para === 'string' && (m.who === 'u' || m.who === 'a'))
-            .slice(-MAXLINES);
-          S.ctx = t.ctx || S.ctx;
-        }
-      }
     } catch (e) {}
-    S.history = S.lines.filter((m) => m.who === 'u').map((m) => m.para).slice(-50);
+    S.lines = [];
+    S.history = [];
+    S.ctx = { lastTopic: '', lastTitle: '', lastContext: '' };
   }
   function saveState() {
-    try {
-      fs.writeFileSync(CHATS_FILE, JSON.stringify({
-        theme: S.theme,
-        tabs: [{ name: 'Sohbet', lines: S.lines.slice(-MAXLINES), ctx: S.ctx }],
-        active: 0, tabN: 1,
-      }), 'utf8');
-    } catch (e) {}
+    // Sohbet icerigi diske yazilmaz (her acilis sifir); yalnizca tema saklanir.
+    try { fs.writeFileSync(CHATS_FILE, JSON.stringify({ theme: S.theme }), 'utf8'); } catch (e) {}
   }
   function saveCtx() {
     try { S.ctx = { lastTopic, lastTitle, lastContext }; } catch (e) {}

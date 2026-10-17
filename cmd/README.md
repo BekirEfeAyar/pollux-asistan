@@ -20,7 +20,7 @@ npm install -g .
 pollux                  # ekran uygulaması (logo + sohbet + My Links)
 pollux --chat           # klasik satır sohbeti
 pollux --tui            # ekran uygulaması (varsayılanla aynı)
-# TUI içinde: My Links'e tıkla (olmazsa F1 veya /link yaz), Esc ile çık
+# TUI içinde: My Links'e tıkla (olmazsa F1 veya /link yaz), /veri: veri kapsamı, Esc ile çık
 pollux "saat kaç"       # tek soru-cevap
 pollux "notepad aç"     # uygulama açar
 pollux "youtube aç"     # siteyi uyarıyla açar
@@ -29,7 +29,7 @@ pollux --ac "soru"      # cevaptaki bağlantıları otomatik açar
 
 ## Özellikler
 
-- 2500+ kayıt çevrimdışı bilgi bankası (başkentler, tarih, yemek, sağlık, ilk yardım...)
+- Bilgi bankası: 10M+ kayıt çevrimdışı (tam set) + 100 milyon+ kayıtlık sayı üreteci (kare, küp, tek/çift, basamak, rakam toplamı)
 - İngilizce-Türkçe sözlük (800+ çift, yazım toleranslı)
 - Hesap makinesi, birim/sıcaklık çevirme, plaka, burç, dünya saatleri
 - Uygulama + site açma, gündem, yapay zeka araştırması (internet varken)

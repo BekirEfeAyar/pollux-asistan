@@ -1,0 +1,385 @@
+// Bulk B4: vocab-turetim (harf/hece) + atasozu + deyim + hayvan
+const fs = require('fs');
+const out = [];
+function add(k, a) { out.push({ k, a }); }
+// ---- 1) Mevcut veriden kelime haznesi cikar ----
+function fold(s) {
+  return s.toLocaleLowerCase('tr').replace(/ç/g, 'c').replace(/ğ/g, 'g')
+    .replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ş/g, 's').replace(/ü/g, 'u')
+    .replace(/['’`]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+const STOP = new Set('mi,mu,misin,musun,nedir,nedi,ne,neresi,nerede,nere,nerde,hangisi,hangi,kac,nasil,neden,nicin,niye,kim,acaba,lutfen,bana,soyle,soyler,anlat,bilgi,hakkinda,ogret,ogren,eder,et,olan,olarak,dir,bir,bu,ve,ile,icin,kadar,sence,peki,ise,nasil,neler,hangileri,nasil,neden,ne,kac,kadar,hangi,once,sonra,gibi,cok,az,daha,en,hem,yada,veya,de,da,ki,ile'.split(','));
+let raw = fs.readFileSync(__dirname + '/knowledge.json', 'utf8').replace(/^﻿/, '');
+const entries = JSON.parse(raw).entries;
+const vocab = new Map();
+for (const e of entries) {
+  for (const t of [...(e.k || []), e.a || '']) {
+    for (const w of fold(t).replace(/[^a-z0-9 ]/g, ' ').split(' ')) {
+      const x = w.trim();
+      if (x.length >= 4 && x.length <= 12 && !STOP.has(x) && /^[a-z]+$/.test(x) && !/^[0-9]+$/.test(x)) {
+        if (!vocab.has(x)) vocab.set(x, (e.a || '').match(new RegExp('(^|[^a-zcgioosuy])' + x + '[^a-zcgioosuy]', 'i')) ? 1 : 0);
+      }
+    }
+  }
+}
+try {
+  const dj = JSON.parse(fs.readFileSync(__dirname + '/dict.json', 'utf8').replace(/^﻿/, ''));
+  for (const [en, tr] of (dj.pairs || [])) {
+    for (const t of [en, tr]) {
+      for (const w of fold(String(t)).replace(/[^a-z0-9 ]/g, ' ').split(' ')) {
+        const x = w.trim();
+        if (x.length >= 4 && x.length <= 12 && !STOP.has(x) && /^[a-z]+$/.test(x)) vocab.set(x, 1);
+      }
+    }
+  }
+} catch (e) {}
+const words = [...vocab.keys()].sort().slice(0, 2200);
+const VOW = new Set(['a', 'e', 'i', 'o', 'u']);
+function vowels(w) { let n = 0; for (const c of w) if (VOW.has(c)) n++; return n; }
+for (const w of words) {
+  const L = w.length, v = vowels(w), c = L - v;
+  add([w + ' kac harfli', w + ' harf sayisi'], w + ' kelimesi ' + L + ' harflidir.');
+  add([w + ' kac heceli', w + ' hece sayisi'], w + ' kelimesi ' + v + ' hecelidir.');
+  add([w + ' ilk harfi ne', w + ' ilk harf hangisi'], w + ' kelimesinin ilk harfi ' + w[0] + "'dir.");
+  add([w + ' son harfi ne', w + ' son harf hangisi'], w + " kelimesinin son harfi " + w[w.length - 1] + "'dir.");
+  add([w + ' kac sesli harf var', w + ' sesli harf sayisi'], w + ' kelimesinde ' + v + ' sesli harf vardir.');
+  add([w + ' kac sessiz harf var', w + ' sessiz harf sayisi'], w + ' kelimesinde ' + c + ' sessiz harf vardir.');
+  add([w + ' ilk uc harfi ne', w + ' ilk uc harf'], w + ' kelimesinin ilk uc harfi ' + w.slice(0, 3) + "'dir.");
+}
+// ---- 2) Atasozleri (uzman derleme, testtekiler haric) ----
+const AT = [
+'Agac yasken egilir|Agac yasken egilir, cocuklar kucuk yasta egitilmelidir.',
+'Ne ekersen onu bicersin|Ne ekersen onu bicersin, yaptiklarinin karsiligini gorursun.',
+'Sakla samani gelir zamani|Sakla samani gelir zamani, kucuk seyler gun gelir ise yarar.',
+'Dost kara gunde belli olur|Dost kara gunde belli olur, gercek dost zor zamanda taninir.',
+'Bir elin nesi var iki elin sesi var|Birlikten kuvvet dogar, imece ile isler kolaylasir.',
+'Azimli fare duvari deler|Azimli fare duvari deler, kararlilikla her engel asilir.',
+'Danisan dagi asmis|Danisarak is yapan zorluklari asar.',
+'Bin dusun bir soyle|Konusmadan once iyi dusunmek gerekir.',
+'Soz agizdan cikar|Verilen soz tutulmalidir, soz ucar yazi kalir.',
+'Aclik oyun bozar|Aclarin derdi oyundan baskadir, ihtiyac onceliklidir.',
+'Tok acin halinden bilmez|Varlikli olan yoksulun derdini anlamaz.',
+'Gulme komsuna gelir basina|Baskasinin derdine gulenin basina aynisi gelir.',
+'Kus kusle ucar|Insan kendine benzeyenlerle arkadas olur.',
+'Uzumu kara gozunden|Her sey gorunusuyle degil ozuyle degerlendirilir.',
+'Balik bastan kokar|Bozulma yoneticiden baslar.',
+'At sahibine gore kisner|Calisan yoneticisine gore davranir.',
+'Demir tavinda dovulur|Is firsat varken yapilmalidir.',
+'Erken kalkan yol alir|Erken baslayan ise onde gider.',
+'Gec olsun guc olmasin|Is gec de olsa saglam olsun.',
+'Iyi dost kara gunde|Zor zamanda yaninda olan gercek dosttur.',
+'Komur goz?NO',
+'Ates olmayan yerden duman cikmaz|Her dedikodunun bir dayanagi vardir.',
+'Su uyur dusman uyumaz|Tehlike her an gelebilir, uyanik olmak gerekir.',
+'Yalancinin mumu yatsiya kadar yanar|Yalan er ya da gec ortaya cikar.',
+'Dogru soyleyeni dokuz koyden kovarlar|Dogruyu soylemek cesaret ister, herkes sevmez.',
+'Bos cubuk?NO',
+'Iyilik eden iyilik bulur|Iyilik yapan karsiliginda iyilik gorur.',
+'Kotu soyleyen kotu isitir|Kotu soz soyleyen kotu karsilik alir.',
+'Eden bulur|Yapan ettigini ceker.',
+'Alimden zalim?NO',
+'Calismak ibadettir?NO',
+'Bilmemek ayip degil ogrenmemek ayip|Bilgisizlik degil ogrenmeye usenmek kotudur.',
+'Okumak cehaleti alir?NO',
+'Kitap en iyi dosttur|Kitaplar insana en sadik dosttur.',
+'Soyle bana dostunu soyleyeyim sana kim oldugunu|Insan arkadasindan belli olur.',
+'Kisi refikinden azar|Insan arkadasindan etkilenir.',
+'Her koyun kendi bacagindan asilir|Herkes kendi yaptigindan sorumludur.',
+'Kendi dusen aglamaz|Kendi hatasiyla dusen sikayet edemez.',
+'Gul dikensiz olmaz|Her guzelligin bir zorlugu vardir.',
+'Dikensiz gul olmaz|Basari emek ister.',
+'Emeksiz yemek olmaz|Calismadan kazanc olmaz.',
+'Alin teri kutsaldir?NO',
+'Zahmetsiz rahmet olmaz|Emek vermeden nimete ulasilmaz.',
+'Akan su yosun tutmaz|Surekli calisan paslanmaz, tembellesmez.',
+'Isleyen demir pas tutmaz?TEST-SKIP',
+'Yuvarlanan tas yosun tutmaz|Surekli gezinen bir yerde kok salamaz.',
+'Bugunun isi yarina kalmaz|Isler vaktinde yapilmalidir.',
+'Yarin yaparim diyen bugunu kacirir|Erteleyen firsati kacirir.',
+'Vakit nakittir|Zaman paradan degerlidir.',
+'Zaman her seyin ilacidir|Acilar zamanla hafifler.',
+'Sabreden dervis muradina ermis|Sabirli olan istedigine kavusur.',
+'Sabrin sonu selamettir|Sabreden kurtulusa erer.',
+'Aceleyle menzil alinmaz?TEST-BENZER',
+'Tatlilikla yilan deliginden cikar|Tatli dil her kapiyi acar.',
+'Tatli dil yilani deliginden cikarir|Guzel soz en inatciyi bile yumusatir.',
+'Keskin sirke kupune zarar|Ofkeli insan once kendine zarar verir.',
+'Ofke baldan tatlidir?NO',
+'Ofkede kalkan zararla oturur|Ofkeyle is yapan pisman olur.',
+'Pismanlik fayda etmez?NO',
+'Zararin neresinden donulurse kardir|Hatadan erken donmek kazanctir.',
+'Hata insana mahsustur|Herkes hata yapabilir, onemli olan ders almak.',
+'Beser sas?NO',
+'Insan beser durur?NO',
+'Hayatta her sey olur|Ummadik seyler basimiza gelebilir.',
+'Her isin basi saglik|Saglik her seyden onemlidir.',
+'Saglik varliktir?NO',
+'Olmek var donmek yok?NO',
+'Giden gider kalan saglar bizimdir?NO',
+'Olulerin ardindan?NO',
+'Damlaya damlaya gol olur?TEST-SKIP',
+'Tasi delen suyun gucu degil damlalarin surekliligidir|Sureklilik gucten onemlidir.',
+'Surek ava gider?NO',
+'Avci avlanir?NO',
+'Kurdun adini an?NO',
+'Kurt dumanli havayi sever?NO',
+'Tilki kurksuz?NO',
+'Aslan yattigi yerden belli olur|Insan duzeninden, cevSinden belli olur.',
+'It disi?NO',
+'Kopek havladigiyla isirmaz?NO',
+'Havlayan kopek isirmaz|Cok bagiran zararsiz olur.',
+'Kedi uzanamadigi cigere mundar der|Ulasamadigina kotu der insan.',
+'Ciger?DUP',
+'Mart kedisi?NO',
+'Karga boku?NO',
+'Esek hosaf?NO',
+'Esege altin semer vursalar yine esektir?RUDE-SKIP',
+'Cahile laf anlatmak?NO',
+'Cahille sohbet?NO',
+'Olme es?NO',
+'Eski dost dusman olmaz?NO',
+'Eski dusman dost olmaz?RISK-SKIP',
+'Dusmanin dusmani?NO',
+'Komus?NO',
+'Ev alma komsu al|Komusluk evden onemlidir.',
+'Komusculuk olmez?NO',
+'Akraba ile ye ic alisveris etme?NO',
+'Kan bag?NO',
+'Aile her seydir?NO'];
+for (const r of AT) {
+  if (!r || r.includes('?')) continue;
+  const i = r.indexOf('|');
+  add([r.slice(0, i).split(' ').slice(0, 4).join(' ') + ' ne demek', r.slice(0, i).split(' ').slice(0, 3).join(' ') + ' atasozu anlami'], r.slice(i + 1));
+}
+// ---- 3) Deyimler ----
+const DE = [
+'Burnu havada olmak|Kibirli davranmak, kendini begenmis olmak.',
+'Agzi kulaklarina varmak|Cok sevinmek.',
+'Gozleri parlamak|Heyecanlanmak, sevinmek.',
+'Ici icine sigmiyor|Heyecandan yerinde duramamak.',
+'Ayaklari yerden kesilmek|Cok mutlu olmak.',
+'Yuzu guldurmek?NO',
+'Kulak misafiri olmak|Baskalarinin konusmasini gizlice dinlemek.',
+'Goz kulak olmak|Dikkatle izlemek, gozetlemek.',
+'El atmak|Bir ise girismek, yardim etmek.',
+'El ustunde tutmak|Cok deger vermek.',
+'Bas taci etmek|Cok saygi gostermek.',
+'Goz bebegi gibi korumak|Titizlikle korumak.',
+'Can kulan?NO',
+'Dili tutulmak|Saskinliktan konusamamak.',
+'Nutku tutulmak|Heyecandan konusamamak.',
+'Akli basindan gitmek|Cok saskirmak.',
+'Basindan asagi kaynar sular dokulmek|Cok uzulmek, saskirmak.',
+'Kan beynine sicramak|Cok ofkelenmek.',
+'Burun buruna gelmek|Ansizin karsilasmak.',
+'Omuz omuza vermek|Dayanisma icinde olmak.',
+'Sirt sirta vermek?DUP',
+'Kafa kafaya vermek|Birlikte dusunmek, danismak.',
+'Dirsek temasi?NO',
+'Kol kanat germek|Korumak, sahiplenmek.',
+'Sirtini dayamak|Birine guvenerek is yapmak.',
+'Bel baglamak|Guvenmek, umut baglamak.',
+'Gozden dusmek?TEST-SKIP',
+'Gozde buyumek|Degeri artmak.',
+'Elde avucta kalmamak|Parasi bitmek.',
+'Metelik yok?NO',
+'Bes parasiz kalmak|Hic parasi kalmamak.',
+'Dara dusmek|Zor duruma girmek.',
+'Zorda kalmak?DUP',
+'Burnundan solumak|Cok ofkeli olmak.',
+'Dis bilemek|Kin beslemek, intikam planlamak.',
+'Kin gytmek?NO',
+'Agzini bicak acmiyor?NO',
+'Agzindan kerpetenle laf almak|Zor konusani konusturmak.',
+'Lafi agzinda gevelemek|Acik konusmamak.',
+'Topu taca atmak|Sorumluluktan kacmak.',
+'Isi yokusa surmek?NO',
+'Yokusu gostermek?NO',
+'Suyu yokus?NO',
+'Ipe un sermek|Bahane uretmek, oyalamak.',
+'Oyalama taktik?NO',
+'Zamana oynamak|Sureci uzatmaya calismak.',
+'Atesle oynamak|Tehlikeli is yapmak.',
+'Ates pahasina?NO',
+'Gozunu karartmak|Tehlikeyi goze almak.',
+'Gozunu budaktan esirgememek?NO',
+'Cana basmak?NO',
+'Cani burnuna gelmek?NO',
+'Canindan bezmek|Yasamaktan bikip usanmak.',
+'Biktim usandim?NO',
+'Tadi damaginda kalmak|Cok begenmek.',
+'Damaginda kalmak?DUP',
+'Parmak isirtmak?NO',
+'Parmakla gosterilmek|Ornek kisi olmak.',
+'Ornek teskil?NO',
+'Adi cikmak?NO',
+'Adi kotuye cikmak|Kotu un salmak.',
+'Unu duyulmak?NO',
+'Sohreti yakalamak?NO',
+'Yildizi parlamak|Unu artmak, basarili olmak.',
+'Bahti acilmak|Sansi donmek.',
+'Sansi yaver gitmek?DUP',
+'Yuzu gulmek|Isleri yolunda gitmek.',
+'Isleri tıkır?NO',
+'Isler yolunda?NO',
+'Keyfi yerinde olmak|Huzurlu olmak.',
+'Tadi kacmak?NO',
+'Agzi tadi?NO',
+'Moral bozuk?NO',
+'Moral tazelemek?NO',
+'Kafa dagitmak|Eglenceli seyle stres atmak.',
+'Stres atmak?DUP',
+'Icini dokmek|Dertlerini anlatmak.',
+'Dert yanmak?DUP',
+'Yuregi sizlamak?NO',
+'Yuregi burkulmak|Acimak, uzulmek.',
+'Ici sizlamak?DUP',
+'Bagi cozulmek?NO',
+'Dizlerinin bagi cozulmek|Korkudan ayakta duramamak.',
+'Ayaklari geri gitmek|Isteksizce gitmek.',
+'Gonulsuz olmak?NO',
+'Eli varmamak?NO',
+'Eli gitmemek?NO',
+'Gonlu elvermemek?NO',
+'Ici rahat etmemek?NO',
+'Kafasinda soru isareti?NO',
+'Aklinda kalmak?NO',
+'Kulaginda cunlamak?NO',
+'Gozunde canlanmak|Hatirlamak, hayal etmek.',
+'Hayal meyal?NO',
+'Ruya gibi?NO',
+'Masalmis gibi?NO',
+'Dudak bukmek|Begememek.',
+'Burun kivirmak?NO',
+'Kaslarini catmak?NO',
+'Yuzunu eksitmek?NO',
+'Surat asmak?NO',
+'Agzi acik kalmak|Cok sasirmak.',
+'Saskina donmek?DUP',
+'Donakalmak?NO',
+'Kucuk dilini yutmak|Cok sasirmak.',
+'Sasirmaktan ne?NO',
+'Gozlerine inanamamak?NO',
+'Hayretler icinde?NO',
+'Tuyleri diken olmak?NO',
+'Tuyleri urpermek|Korkmak, heyecanlanmak.',
+'Kani donmak?NO',
+'Bet beniz atmak?NO',
+'Rengi solmak?NO',
+'Yuzu kirec gibi?NO',
+'Ter icinde kalmak?NO',
+'Sirilsiklam olmak?NO',
+'Mum gibi erimek?NO',
+'Zayiflamak kilo?NO',
+'Bir deri bir kemik?NO',
+'Kup kuru olmak?NO',
+'Daldan dala atlamak?NO',
+'Konudan konuya?NO',
+'Laf kalabaligi yapmak?NO',
+'Bos bogaz?NO',
+'Cenesi dusuk olmak?NO',
+'Geveze olmak?DUP'];
+for (const r of DE) {
+  if (!r || r.includes('?')) continue;
+  const i = r.indexOf('|');
+  add([r.slice(0, i).split(' ').slice(0, 4).join(' ') + ' ne demek', r.slice(0, i).split(' ').slice(0, 3).join(' ') + ' deyimi anlami'], r.slice(i + 1));
+}
+// ---- 4) Hayvanlar: ad|yasam|bilgi ----
+const HA = [
+'ornitorenk|Avustralya|Ornitorenk hem yumurtlayan hem sut emziren, gagali ilginc bir memelidir.',
+'kapibara|Guney Amerika|Kapibara dunyadaki en buyuk kemirgendir, cok iyi yuzer.',
+'pangolin|Asya ve Afrika|Pangolin pullu vucuduyla karincayiyen olarak yasamini surdurur.',
+'aksolotl|Meksika|Axolotl yasam boyu solungacli kalan, uzuvlarini yenileyebilen bir semenderdir.',
+'kivi kusu|Yeni Zelanda|Kivi kusu ucamayan, geceleri aktif, burnuyla koku alan bir kustur.',
+'okapi|Orta Afrika|Okapi zurafoya akraba, ormanda yasayan cizgili bacakli bir memelidir.',
+'tapir|Guney Amerika ve Asya|Tapir hortumlu burnuyla yaprak yiyen, iyi yuzen bir memelidir.',
+'karakulak|Turkiye dahil genis cografya|Karakulak kulaklarindaki puskulleriyle taninan yirtici bir kedidir.',
+'dugong|Hint ve Pasifik|Dugong deniz cayirlarinda otlayan sakin bir deniz memelisidir.',
+'narval|Kuzey Kutbu|Narval spiral disiyle tek boynuzlu gibi gorunen bir balinadir.',
+'fossa|Madagaskar|Fossa Madagaskar etoburu, cok ceviktir.',
+'kuokka|Avustralya|Quokka gulumsuyor gibi gorunumuyle unlu kucuk bir keseli hayvandir.',
+'surikat|Afrika|Surikatlar kolonilerde yasar, nobetleserek cevreyi izler.',
+'tembel hayvan|Orta Amerika|Tembel hayvan agaclarda yavas hareket eder, gunun cogunu uyur.',
+'armadillo|Amerika|Armadillo zirhli kabuguyla kendini koruyan bir memelidir.',
+'kirpi|Avrupa ve Asya|Kirpi dikenleriyle korunur, gece bocek avlar.',
+'kokarca|Amerika|Kokarca tehlike aninda kotu kokulu sivi puskurtur.',
+'kunduz|Kuzey yarimkure|Kunduz baraj yapma becerisiyle unlu, agac kemiren bir kemirgendir.',
+'susamuru|Avrupa Asya Amerika|Susamuru suda oynayan, balikla beslenen sevimli bir memelidir.',
+'gelincik|Avrasya|Gelincik ince uzun vucuduyla fare avlayan hizli bir etoburdur.',
+'porsuk|Avrupa ve Asya|Porsuk gece aktif, topragi kazan guclu bir memelidir.',
+'yabandomuzu|Avrasya|Yaban domuzu suruler halinde gezen guclu bir memelidir.',
+'geyik|Kuzey yarimkure|Geyik erkeklerinin her yil dokulen catalli boynuzlari vardir.',
+'karaca|Avrupa ve Anadolu|Karaca ormanlik alanlarda yasayan kucuk zarif bir geyiktir.',
+'dag kecisi|Toroslar ve daglar|Dag kecisi sarp kayaliklarda ustaca tirmanir.',
+'cengel boynuzlu daggecisi?SKIP',
+'vaşak?SKIP',
+'cakal|Anadolu ve genis cografya|Cakal gece avlanan, ulumasiyla taninan bir yirticidir.',
+'tilki|Hemen her kita|Tilki kurnazligi ve kabarik kuyruguyla unlu bir etoburdur.',
+'kurt|Kuzey yarimkure|Kurt suruler halinde avlanan dayanikli bir yirticidir.',
+'ay|Turkiye ormanlari|Bozayi kisin uyur, bal ve meyveye bayilir.',
+'sirtlan|Afrika ve Asya|Sirtlan guclu cenesiyle kemik bile kirar.',
+'c tourism?SKIP',
+'zebra|Afrika|Zebra cizgileri parmak izi gibi her bireyde farklidir.',
+'zurafa|Afrika|Zurafa dunyadaki en uzun kara hayvanidir, dili yarim metredir.',
+'su aygiri|Afrika|Su aygiri gunduz suda serinler, gece otlanir.',
+'gergedan|Afrika ve Asya|Gergedan kalin derisi ve boynuzuyla unlu iri bir memelidir.',
+'fil|Afrika ve Asya|Filler hortumlariyla su icer, kulaklariyla serinler.',
+'deve|Col ve step|Deve horgucunde yag depolar, susuzluga cok dayaniklidir.',
+'lama|And Daglari|Lama yuk tasir, tukurmesiyle unludur.',
+'alpaka|And Daglari|Alpaka yumusacik yunu icin beslenir.',
+'bizon|Kuzey Amerika|Bizon buyuk suruler halinde yasayan guclu bir sigirdir.',
+'yak|Himalayalar|Yak soguga dayanikli, uzun tuylu bir dag sigiridir.',
+'okuz?SKIP',
+'manda|Asya|Manda bataklik sever, sutunden kaymak yapilir.',
+'koala|Avustralya|Koala okaliptus yapragi yer, gunun 20 saati uyur.',
+'kanguru?TEST-SKIP',
+'vombat|Avustralya|Vombat oyuk kazan guclu bir keselidir.',
+'keseli fare?SKIP',
+'tazmanya canavari|Tazmanya|Tazmanya canavari guclu ceneli, gececi bir keselidir.',
+'ornitorenk?DUP',
+'kirlangic|Gocmen|Kirlangiclar uzun gocleriyle bilinir, eve baglidir.',
+'leylek|Anadolu|Leylekler ilkbaharda gelir, baca ve direklere yuva yapar.',
+'flamingo|Tuz golu ve sulak alanlar|Flamingolar pembe renklerini yedikleri yosundan alir.',
+'pelikan|Sulak alanlar|Pelikanlar keselerindeki baliklari suzerek yer.',
+'kartal|Daglik bolgeler|Kartallar keskin gozleriyle yuksekten av gorur.',
+'sahin|Acik alanlar|Sahinler hizli dalis yapabilen yirtici kuslardir.',
+'dogan|Dag ve kayalik|Doganlar dunyadaki en hizli hayvanlardandir.',
+'atmaca|Ormanlik|Atmaca kisa kanatlariyla agac arasi ucar.',
+'puhu|Anadolu|Puhu en buyuk baykuslardandir, gece avlanir.',
+'pecelik?SKIP',
+'agackakan|Ormanlar|Agackakan gagalariyla odunu deler, dili cok uzundur.',
+'papa?SKIP',
+'ispinoz|Avrupa|Ispinozlar renkli tuylu, oten kucuk kuslardir.',
+'kanarya|Evcil|Kanaryalar guzel otusleriyle unlu kucuk kuslardir.',
+'muhabbet kusu|Evcil|Muhabbet kuslari konusmayi taklit edebilir, cok sosyaldir.',
+'guguk kusu|Avrasya|Guguk kusu yumurtasini baska kuslarin yuvasina birakir.',
+'bülbul?SKIP',
+'serce|Sehirler|Serceler insanlara en yakin yasayan kucuk kuslardandir.',
+'karga|Her yer|Kargalar alet kullanabilen cok zeki kuslardir.',
+'saksagan|Avrasya|Saksaganlar parlak nesneleri toplamayi sever.',
+'hukumdar?SKIP',
+'tavus kusu|Hindistan|Tavus kusunun kuyrugu acilinca goz desenli muhtesem gorunur.',
+'sulun|Karadeniz|Sulunlar renkli tuylu, eti icin avlanan kuslardir.',
+'keklik|Anadolu|Keklikler taslik alanlarda yasayan oten kuslardir.',
+'bıldırcın?SKIP',
+'devekuşu|Afrika|Devekusu ucamayan en buyuk kustur, cok hizli kosar.',
+'penguen?TEST-SKIP',
+'puffin|Kuzey denizleri|Puffin renkli gagasiyla sevimli bir deniz kusudur.',
+'marti|Kiyilar|Martilar balikla beslenir, kalabalik kolonilerde yasar.',
+'karabatak|Goller ve deniz|Karabataklar dalarak balik avlar.',
+'balikcil|Sulak alanlar|Balikcillar sabirla bekleyip ani dalarla avlanir.',
+'turna|Anadolu sulak alan|Turnalar zarif boyunlari ve danslariyla unludur.',
+'angit?SKIP',
+'kaz|Evcil ve yaban|Kazlar suru halinde ucar, V dizilisiyle enerji korur.',
+'orde?SKIP',
+'kugu|Goller|Kugular tek esli yasar, beyaz tuyleriyle zariftir.',
+'an?SKIP'];
+for (const r of HA) {
+  if (!r || r.includes('?')) continue;
+  const p = r.split('|');
+  if (p.length !== 3) continue;
+  add([p[0] + ' nerede yasar', p[0] + ' yasam alani'], p[0][0].toLocaleUpperCase('tr') + p[0].slice(1) + ' ' + p[1] + " bolgesinde yasar. " + p[2]);
+  add([p[0] + ' hakkinda bilgi', p[0] + ' nedir ozellikleri'], p[2]);
+}
+fs.writeFileSync(__dirname + '/bulk-part-4.json', JSON.stringify(out), 'utf8');
+console.log('PART4: ' + out.length + ' kelime:' + words.length);

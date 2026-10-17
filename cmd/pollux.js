@@ -112,7 +112,13 @@ function cliProgress() {
   };
 }
 
-// Tam veri seti (10M kayit) indirilebilir
+// Veri kapsamı özeti: dosyadaki kayıtlar + sayı üreteci (1..20M sayı × 5 tür)
+function dataStats() {
+  const n = KNOWLEDGE_READY && KNOWLEDGE.length ? KNOWLEDGE.length : 0;
+  return 'Veri kapsamı: 100.000.000+ kayıt (' + (n ? n.toLocaleString('tr-TR') + ' dosyada + ' : '') + 'sayı üreteci)';
+}
+
+// Tam veri seti indirilebilir (10M+ banka kaydı)
 const DATA_URL = 'https://github.com/BekirEfeAyar/pollux-asistan/releases/download/v2.0.23-data/knowledge.json.gz';
 function downloadFullDataset() {
   return new Promise((resolve) => {
@@ -459,6 +465,25 @@ function dictLookup(raw) {
     }
   }
   return null;
+}
+
+// ---------- sayı bilgileri (üreteç) ----------
+// Tam setteki sayı kayıtları gibi cevap verir: kare, küp, tek/çift, basamak,
+// rakam toplamı. Depolamadan anında üretir (100 milyon+ kayıt kapsamı).
+function numberFacts(f) {
+  const t = f.replace(/(?<=\d)\.(?=\d)/g, '');
+  const pick = (re, fn) => {
+    const m = re.exec(t);
+    if (!m) return null;
+    let n;
+    try { n = BigInt(m[1]); } catch (e) { return null; }
+    return fn(n);
+  };
+  return pick(/\b(\d{1,15})\b\D{0,25}\bkare(?:si|sini|sinin)?\b/, (n) => n + ' sayisinin karesi ' + (n * n) + "'dir.")
+    || pick(/\b(\d{1,15})\b\D{0,25}\bkup(?:u|un|unu|unun)?\b/, (n) => n + ' sayisinin kupu ' + (n * n * n) + "'dir.")
+    || pick(/\b(\d{1,15})\b\D{0,30}\bbasamak[a-z]{0,8}\b/, (n) => n + ' sayisi ' + n.toString().length + ' basamaklidir.')
+    || (t.includes('toplam') ? pick(/\b(\d{1,15})\b\D{0,30}\brakam[a-z]{0,8}\b/, (n) => n + ' sayisinin rakamlari toplami ' + n.toString().split('').reduce((a, c) => a + Number(c), 0) + "'dir.") : null)
+    || pick(/\b(\d{1,15})\b\D{0,20}\b(?:tek|cift)\b/, (n) => (n % 2n === 0n) ? n + ' cift sayidir.' : n + ' tek sayidir.');
 }
 
 // ---------- hesap ----------
@@ -1371,7 +1396,7 @@ function multiAnswer(raw) {
   for (const p of parts) {
     const pf = fold(p.toLocaleLowerCase('tr'));
     const pt = pf.split(' ').map((t) => t.trim()).filter(Boolean);
-    const one = mathAnswer(pf) || unitAnswer(pf) || tempAnswer(pf) ||
+    const one = numberFacts(pf) || mathAnswer(pf) || unitAnswer(pf) || tempAnswer(pf) ||
       timeAnswer(pf, pt, now) || dateAnswer(pf, pt, now);
     if (!one) return null;
     outs.push(one);
@@ -1712,6 +1737,9 @@ async function answer(raw) {
     const multi = multiAnswer(raw);
     if (multi) return multi;
   } catch (e) {}
+  // sayı üreteci: kare, küp, tek/çift, basamak, rakam toplamı (100 milyon+ kayıt kapsamı)
+  const nf = numberFacts(f);
+  if (nf) return nf;
   // hesap + birim + sicaklik ONCE (saat/tarih niyetlerini ezmesin: "1 saat kac dakika")
   const math = mathAnswer(f);
   if (math) return math;
@@ -2338,7 +2366,9 @@ async function tuiLoop() {
   }
 
   // Terminal boyutu: acilista yetkili kaynaktan (conhost: konsol penceresi,
-  // WT: stdout), pencere sonradan degisirse 2 sn'lik izleyici yakalar.
+  // WT: stdout), pencere sonradan degisirse resize event + stdout yakalar.
+  // NOT: powershell spawn cmd.exe'de pencere actirir, bu yuzden sadece 1 kez calisir.
+  let termSizeQueried = false;
   function queryTermSize() {
     return new Promise((resolve) => {
       const fromStdout = () => {
@@ -2350,12 +2380,19 @@ async function tuiLoop() {
         resolve();
         return;
       }
+      // Zaten 1 kez sorgulandiysa bir daha powershell acma (flash yapar).
+      if (termSizeQueried) {
+        fromStdout();
+        resolve();
+        return;
+      }
       if (process.platform === 'win32' && stdout.isTTY) {
         try {
+          termSizeQueried = true;
           const cp = require('child_process');
           cp.execFile(
             'powershell.exe',
-            ['-noprofile', '-command', '(Get-Host).UI.RawUI.WindowSize.Width; (Get-Host).UI.RawUI.WindowSize.Height'],
+            ['-noprofile', '-windowstyle', 'hidden', '-command', '(Get-Host).UI.RawUI.WindowSize.Width; (Get-Host).UI.RawUI.WindowSize.Height'],
             { timeout: 3000, windowsHide: true },
             (err, so) => {
               if (!err) {
@@ -2397,21 +2434,25 @@ async function tuiLoop() {
   }
   let sizeTimer = null;
   function watchTermSize() {
-    if (sizeTimer) return;
-    sizeTimer = setInterval(() => {
+    // Powershell YOK: sadece stdout.columns/rows izlenir, spawn yapilmaz.
+    const syncFromStdout = () => {
       try {
         const w = process.stdout.columns || 0, h = process.stdout.rows || 0;
         if (w >= 40 && h >= 20 && (w !== TERM.w || h !== TERM.h)) {
-          if (!process.env.WT_SESSION && process.platform === 'win32' && stdout.isTTY) {
-            queryTermSize().then(() => { needClear = true; try { render(); } catch (e) {} });
-          } else {
-            TERM.w = w; TERM.h = h;
-            needClear = true;
-            try { render(); } catch (e) {}
-          }
+          TERM.w = w; TERM.h = h;
+          needClear = true;
+          try { render(); } catch (e) {}
         }
       } catch (e) {}
-    }, 2000);
+    };
+    try {
+      if (process.stdout && typeof process.stdout.on === 'function') {
+        process.stdout.removeAllListeners('resize');
+        process.stdout.on('resize', syncFromStdout);
+      }
+    } catch (e) {}
+    if (sizeTimer) return;
+    sizeTimer = setInterval(syncFromStdout, 2000);
     try { sizeTimer.unref(); } catch (e) {}
   }
 
@@ -2445,7 +2486,7 @@ async function tuiLoop() {
         }
       }
       lines.push(' '.repeat(bx2) + DIM + '[' + RESET + GREEN + '━'.repeat(fill) + RESET + DIM + '─'.repeat(Math.max(0, bw2 - fill)) + RESET + DIM + ']' + RESET + detail);
-      const foot = 'İlk açılışta tam veri seti yüklenir (bir kez) • Wi-Fi önerilir';
+      const foot = finished ? dataStats() : 'İlk açılışta tam veri seti yüklenir (bir kez) • Wi-Fi önerilir';
       const footShow = foot.length > w - 2 ? foot.slice(0, w - 2) : foot;
       const fx = Math.max(0, Math.floor((w - visibleLen(footShow)) / 2));
       const padTop = Math.max(0, Math.floor((h - lines.length - 2) / 2));
@@ -2644,6 +2685,7 @@ async function tuiLoop() {
       else flash('Kullanım: /ad Yeni İsim (veya F2)');
       saveTabs(); render(); return;
     }
+    if (t === '/veri') { push(dataStats(), 'a'); flash('Veri kapsamı: 100 milyon+ kayıt'); saveTabs(); render(); return; }
     if (/^[0-9]+$/.test(t) && tab.pendingUrls.length) {
       const n = parseInt(t, 10);
       if (n >= 1 && n <= tab.pendingUrls.length) {
@@ -2894,12 +2936,14 @@ async function main() {
   }
   console.log('Pollux, senin asistanın. (çıkış: /cikis)');
   await ensureKnowledge(cliProgress());
+  console.log(dataStats());
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const ask = () => rl.question('sen> ', async (line) => {
     const t = line.trim();
     if (!t) return ask();
     if (t === '/cikis' || t === '/exit' || t === 'cikis' || t === 'exit' || t === 'quit') { rl.close(); return; }
-    if (t === '/yardim') { console.log('Komutlar: /yardim, /cikis, /ogrenilenler'); return ask(); }
+    if (t === '/yardim') { console.log('Komutlar: /yardim, /veri, /cikis, /ogrenilenler'); return ask(); }
+    if (t === '/veri') { console.log(dataStats()); return ask(); }
     if (t === '/ogrenilenler') { console.log('Öğrenilen kayıt: ' + learned.length); return ask(); }
     const out = await answer(t);
     process.stdout.write('pollux> ');

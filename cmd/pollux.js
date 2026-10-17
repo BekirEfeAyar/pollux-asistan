@@ -2324,7 +2324,7 @@ async function tuiLoop() {
     theme: 'koyu', C: null,
     online: null, confirmUrl: null, confirmName: '',
     pendingUrls: [], history: [], histIdx: -1, histDraft: '',
-    cursorOn: true, blink: 0, flashMsg: '', flashUntil: 0,
+    flashMsg: '', flashUntil: 0,
     urlRegions: [], linkRegions: [], inputGeom: null,
     compIdx: -1, compList: [],
     panel: false, helpBase: 0, inSplash: false, plain: false,
@@ -2430,6 +2430,8 @@ async function tuiLoop() {
     S.lastRows = lines;
     let buf = '\x1b[?25l' + (clear ? '\x1b[2J' : '');
     for (let r = minR; r <= maxR; r++) buf += '\x1b[' + (r + 1) + ';1H' + lines[r];
+    // standart terminal imleci: giris satirindaki konuma tasi ve goster (altin blok cizilmez)
+    if (S.inputGeom) buf += '\x1b[' + (S.inputGeom.row + 1) + ';' + (S.inputGeom.col + 1) + 'H\x1b[?25h';
     stdout.write(buf);
   }
   function userRows(para, w) {
@@ -2559,6 +2561,7 @@ async function tuiLoop() {
   }
   function render() {
     try {
+      S.inputGeom = null;
       const { w, h } = tuiSize();
       const CH = Math.max(3, h - 5);
       const rows = [];
@@ -2613,12 +2616,10 @@ async function tuiLoop() {
         if (ghost && S.input.length + 1 + ghost.length > avail) ghost = '';
       }
       const pseg = [['', ' '.repeat(PAD)], ['a!', '❯ ']];
-      pseg.push(['', shown.slice(0, cursorInShown)]);
-      if (S.cursorOn) pseg.push(['cursor', '█']);
-      pseg.push(['', shown.slice(cursorInShown)]);
+      pseg.push(['', shown]);
       if (ghost) pseg.push(['d', ghost]);
       rows.push(segRow(pseg));
-      S.inputGeom = { row: h - 2, x0: PAD + 2, len: shown.length, win: win };
+      S.inputGeom = { row: h - 2, x0: PAD + 2, len: shown.length, win: win, col: PAD + 2 + cursorInShown };
       // alt bilgi
       rows.push(segRow([['', ' '.repeat(PAD)], ['rule', '─'.repeat(Math.max(0, w - PAD * 2))]]));
       const flashOn = S.flashUntil && Date.now() < S.flashUntil;
@@ -3012,8 +3013,6 @@ async function tuiLoop() {
   const timer = setInterval(() => {
     let need = false;
     if (S.busy) { S.spin = (S.spin + 1) % TUI_SPIN.length; need = true; }
-    S.blink++;
-    if (S.blink % 5 === 0) { S.cursorOn = !S.cursorOn; need = true; }
     if (S.flashUntil && Date.now() >= S.flashUntil) { S.flashUntil = 0; need = true; }
     if (need && !S.inSplash) { try { render(); } catch (e) {} }
   }, 90);

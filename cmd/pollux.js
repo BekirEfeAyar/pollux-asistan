@@ -6,7 +6,6 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const readline = require('readline');
-const zlib = require('zlib');
 
 const DIR = __dirname;
 function readJson(name, fallback) {
@@ -118,28 +117,6 @@ function dataStats() {
   return 'Veri kapsamı: 100.000.000+ kayıt (' + (n ? n.toLocaleString('tr-TR') + ' dosyada + ' : '') + 'sayı üreteci)';
 }
 
-// Tam veri seti indirilebilir (10M+ banka kaydı)
-const DATA_URL = 'https://github.com/BekirEfeAyar/pollux-asistan/releases/download/v2.0.23-data/knowledge.json.gz';
-function downloadFullDataset() {
-  return new Promise((resolve) => {
-    const tmpFile = path.join(DIR, 'knowledge.json.gz');
-    const out = fs.createWriteStream(tmpFile);
-    https.get(DATA_URL, (res) => {
-      if (res.statusCode !== 200) { out.end(); resolve(false); return; }
-      res.pipe(out);
-      out.on('finish', () => {
-        out.close();
-        try {
-          const gz = fs.readFileSync(tmpFile);
-          const json = zlib.gunzipSync(gz);
-          fs.writeFileSync(path.join(DIR, 'knowledge.json'), json);
-          fs.unlinkSync(tmpFile);
-          resolve(true);
-        } catch (e) { resolve(false); }
-      });
-    }).on('error', () => resolve(false));
-  });
-}
 function userDataDir() {
   // Kullaniciya ozel yazilabilir klasor (global npm kurulumunda paket klasoru salt-okunur olabilir)
   try {
@@ -776,21 +753,6 @@ function listApps() {
 
 // ---------- sehir plaka + dunya saati ----------
 const CITY_PLAKA = { 1: 'Adana', 2: 'Adıyaman', 3: 'Afyonkarahisar', 4: 'Ağrı', 5: 'Amasya', 6: 'Ankara', 7: 'Antalya', 8: 'Artvin', 9: 'Aydın', 10: 'Balıkesir', 11: 'Bilecik', 12: 'Bingöl', 13: 'Bitlis', 14: 'Bolu', 15: 'Burdur', 16: 'Bursa', 17: 'Çanakkale', 18: 'Çankırı', 19: 'Çorum', 20: 'Denizli', 21: 'Diyarbakır', 22: 'Edirne', 23: 'Elazığ', 24: 'Erzincan', 25: 'Erzurum', 26: 'Eskişehir', 27: 'Gaziantep', 28: 'Giresun', 29: 'Gümüşhane', 30: 'Hakkari', 31: 'Hatay', 32: 'Isparta', 33: 'Mersin', 34: 'İstanbul', 35: 'İzmir', 36: 'Kars', 37: 'Kastamonu', 38: 'Kayseri', 39: 'Kırklareli', 40: 'Kırşehir', 41: 'Kocaeli', 42: 'Konya', 43: 'Kütahya', 44: 'Malatya', 45: 'Manisa', 46: 'Kahramanmaraş', 47: 'Mardin', 48: 'Muğla', 49: 'Muş', 50: 'Nevşehir', 51: 'Niğde', 52: 'Ordu', 53: 'Rize', 54: 'Sakarya', 55: 'Samsun', 56: 'Siirt', 57: 'Sinop', 58: 'Sivas', 59: 'Tekirdağ', 60: 'Tokat', 61: 'Trabzon', 62: 'Tunceli', 63: 'Şanlıurfa', 64: 'Uşak', 65: 'Van', 66: 'Yozgat', 67: 'Zonguldak', 68: 'Aksaray', 69: 'Bayburt', 70: 'Karaman', 71: 'Kırıkkale', 72: 'Batman', 73: 'Şırnak', 74: 'Bartın', 75: 'Ardahan', 76: 'Iğdır', 77: 'Yalova', 78: 'Karabük', 79: 'Kilis', 80: 'Osmaniye', 81: 'Düzce' };
-function cityPlakaAnswer(f) {
-  if (!f.includes('plaka')) return null;
-  const m = /(\d{1,2})\s*plaka/.exec(f);
-  if (m) {
-    const city = CITY_PLAKA[parseInt(m[1], 10)];
-    if (city) return m[1] + ' plaka ' + city + ' ilinindir.';
-    return null;
-  }
-  for (const code in CITY_PLAKA) {
-    if (f.includes(fold(CITY_PLAKA[code].toLocaleLowerCase('tr')))) {
-      return CITY_PLAKA[code] + "'nin plakası " + code + "'dir.";
-    }
-  }
-  return null;
-}
 const CITY_TZ = { londra: 'Europe/London', paris: 'Europe/Paris', berlin: 'Europe/Berlin', roma: 'Europe/Rome', madrid: 'Europe/Madrid', atina: 'Europe/Athens', moskova: 'Europe/Moscow', istanbul: 'Europe/Istanbul', ankara: 'Europe/Istanbul', baku: 'Asia/Baku', kahire: 'Africa/Cairo', dubai: 'Asia/Dubai', tahran: 'Asia/Tehran', delhi: 'Asia/Kolkata', 'yeni delhi': 'Asia/Kolkata', pekin: 'Asia/Shanghai', tokyo: 'Asia/Tokyo', seul: 'Asia/Seoul', 'new york': 'America/New_York', 'los angeles': 'America/Los_Angeles', meksika: 'America/Mexico_City', 'sao paulo': 'America/Sao_Paulo', 'buenos aires': 'America/Argentina/Buenos_Aires', sidney: 'Australia/Sydney' };
 function worldClock(f) {
   if (!f.includes('saat')) return null;
@@ -2041,7 +2003,6 @@ function styleMood() {
 function userIsBrief() {
   return style.lenN >= 3 && (style.lenSum / style.lenN) < 12;
 }
-function userUsesEmoji() { return style.emoji >= 2; }
 // mood'a gore varyant sec (kisa yazanlara kisa cevap oncelikli)
 function personaPick(casual, neutral, formal) {
   const mood = styleMood();
